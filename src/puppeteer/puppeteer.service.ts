@@ -48,9 +48,11 @@ export class PuppeteerService {
       }
     }
 
+    const isProd = process.env.NODE_ENV === 'production';
+
     const browser = await puppeteer.launch({
-      executablePath: process.env.CHROMIUM_EXEC_PATH,
-      headless: false,
+      executablePath: process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
+      headless: isProd, // true на проде, false — локально
       args,
     });
 
