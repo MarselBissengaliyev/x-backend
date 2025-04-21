@@ -77,12 +77,18 @@ export class AccountsService {
 
     await this.puppeteerService.submitCode({ code, page, login });
 
-    await this.prisma.account.create({
-      data: {
-        id: uuid(),
-        ...data,
-      },
+    const account = await this.prisma.account.findUnique({
+      where: { login },
     });
+
+    if (!account) {
+      await this.prisma.account.create({
+        data: {
+          id: uuid(),
+          ...data,
+        },
+      });
+    }
 
     this.sessions.delete(sessionId);
     this.logger.log(
@@ -109,18 +115,35 @@ export class AccountsService {
     const { page, data } = session;
 
     // Отправляем данные через Puppeteer
-    await this.puppeteerService.submitChallenge({
+    const result = await this.puppeteerService.submitChallenge({
       challengeInput,
       page,
       password,
     });
 
-    await this.prisma.account.create({
-      data: {
-        id: uuid(),
-        ...data,
+    if (result.result?.twoFactorRequired) {
+      const sessionId = uuid();
+      this.sessions.set(sessionId, { page, data });
+      this.logger.log(
+        `Two-factor authentication required. Session ID: ${sessionId}`,
+      );
+      return { twoFactorRequired: true, sessionId };
+    }
+
+    const account = await this.prisma.account.findUnique({
+      where: {
+        login: data.login,
       },
     });
+
+    if (!account) {
+      await this.prisma.account.create({
+        data: {
+          id: uuid(),
+          ...data,
+        },
+      });
+    }
 
     // Удаляем сессию после выполнения
     this.sessions.delete(sessionId);

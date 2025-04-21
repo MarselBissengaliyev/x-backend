@@ -156,6 +156,16 @@ export class PuppeteerService {
 
     this.logger.log('Password entered. Waiting for login success...');
 
+    // Проверяем на 2FA
+    try {
+      await page.waitForSelector('input[data-testid="ocfEnterTextTextInput"]', {
+        timeout: 5000,
+      });
+      this.logger.warn('2FA required after password input');
+
+      // Если 2FA требуется, запросим код и передадим его для ввода
+      return { result: { twoFactorRequired: true }, page };
+    } catch {
     // Ждем, пока страница перейдет в режим успешного логина или проверим ошибки
     await page.waitForNavigation({ waitUntil: 'networkidle2' });
 
@@ -170,18 +180,9 @@ export class PuppeteerService {
     ) {
       this.logger.warn('Login failed: ' + loginError);
       return { result: { success: false, error: loginError }, page };
+    } else {
+      return { result: { success: true } }
     }
-
-    // Проверяем на 2FA
-    try {
-      await page.waitForSelector('input[data-testid="ocfEnterTextTextInput"]', {
-        timeout: 5000,
-      });
-      this.logger.warn('2FA required after password input');
-      return { result: { twoFactorRequired: true }, page, password };
-    } catch {
-      this.logger.log('Login successful.');
-      return { readyForPassword: false, success: true, page };
     }
   }
 
