@@ -42,6 +42,13 @@ export class AccountsService {
         return { twoFactorRequired: true, sessionId };
       }
 
+      if (result.challengeRequired) {
+        const sessionId = uuid();
+        this.sessions.set(sessionId, { page, data });
+        this.logger.log(`Challenge required. Session ID: ${sessionId}`);
+        return { challengeRequired: true, sessionId };
+      }
+
       // Создание аккаунта в базе данных
       const account = await this.prisma.account.create({
         data: {
@@ -49,6 +56,7 @@ export class AccountsService {
           ...data,
         },
       });
+
       this.logger.log(`Account created successfully for login: ${data.login}`);
       return { success: true, id: account.id };
     } catch (err) {
@@ -79,6 +87,45 @@ export class AccountsService {
     this.sessions.delete(sessionId);
     this.logger.log(
       `2FA successful and account created for session ID: ${sessionId}`,
+    );
+
+    return { success: true };
+  }
+
+  async submitChallenge(
+    sessionId: string,
+    challengeInput: string,
+    password: string,
+  ) {
+    this.logger.log(`Submitting challenge input for session ID: ${sessionId}`);
+
+    // Получаем сессию из Map
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      this.logger.error(`Session not found for session ID: ${sessionId}`);
+      throw new Error('Сессия не найдена');
+    }
+
+    const { page, data } = session;
+
+    // Отправляем данные через Puppeteer
+    await this.puppeteerService.submitChallenge({
+      challengeInput,
+      page,
+      password,
+    });
+
+    await this.prisma.account.create({
+      data: {
+        id: uuid(),
+        ...data,
+      },
+    });
+
+    // Удаляем сессию после выполнения
+    this.sessions.delete(sessionId);
+    this.logger.log(
+      `Challenge input submitted and session cleared for session ID: ${sessionId}`,
     );
 
     return { success: true };

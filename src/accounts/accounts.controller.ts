@@ -13,8 +13,18 @@ export class AccountsController {
     return this.accountService.create(dto, userAgent);
   }
 
+  @Post('submit-challenge')
+  async submitChallenge(
+    @Body() body: { sessionId: string; challengeInput: string, password: string },
+  ) {
+    const { sessionId, challengeInput, password } = body;
+    return this.accountService.submitChallenge(sessionId, challengeInput, password);
+  }
+
   @Post('submit-code')
-  async submitCode(@Body() body: { sessionId: string; code: string; login: string }) {
+  async submitCode(
+    @Body() body: { sessionId: string; code: string; login: string },
+  ) {
     const { sessionId, code, login } = body;
     return this.accountService.submitCode(sessionId, code, login);
   }

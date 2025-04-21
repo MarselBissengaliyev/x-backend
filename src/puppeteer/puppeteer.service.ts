@@ -89,31 +89,11 @@ export class PuppeteerService {
         return el || '';
       });
 
-      if (challengeText.includes('Enter your phone number or username')) {
+      if (challengeText.includes('Enter your')) {
         this.logger.warn(
           'Unusual login activity detected, waiting for user input...',
         );
-
-        // Ждём появление поля
-        await page.waitForSelector('input[name="text"]', { timeout: 10000 });
-
-        // Ждём, пока пользователь введёт что-то в поле (бесконечно)
-        let inputEntered = false;
-        while (!inputEntered) {
-          const value = await page.$eval(
-            'input[name="text"]',
-            (el) => el.value,
-          );
-          if (value && value.trim().length > 0) {
-            inputEntered = true;
-            this.logger.log('User has entered their username or phone number');
-            await page.keyboard.press('Enter');
-          } else {
-            await delay(1000); // Пауза перед повторной проверкой
-          }
-        }
-
-        await delay(2000); // Небольшая пауза после нажатия Enter
+        return { result: { challengeRequired: true }, page };
       }
     } catch (err) {
       this.logger.log('No unusual activity challenge detected');
@@ -139,7 +119,6 @@ export class PuppeteerService {
     }
 
     this.logger.log('Waiting for 2FA prompt or login success...');
-    this.logger.log('Waiting for 2FA prompt or login success...');
     try {
       await page.waitForSelector('input[data-testid="ocfEnterTextTextInput"]', {
         timeout: 5000,
@@ -149,6 +128,60 @@ export class PuppeteerService {
     } catch {
       this.logger.log('Login successful without 2FA');
       return { result: { success: true }, page };
+    }
+  }
+
+  async submitChallenge({
+    challengeInput,
+    page,
+    password,
+  }: {
+    challengeInput: string;
+    page: puppeteer.Page;
+    password: string;
+  }) {
+    this.logger.log('Submitting unusual login challenge input...');
+
+    await page.type('input[name="text"]', challengeInput);
+    await page.keyboard.press('Enter');
+    await delay(2000);
+
+    this.logger.log('Challenge input submitted. Waiting for password field...');
+
+    await page.waitForSelector('input[name="password"]', { timeout: 10000 });
+
+    // Теперь используем переданный пароль для заполнения поля пароля
+    await page.type('input[name="password"]', password);
+    await page.keyboard.press('Enter');
+
+    this.logger.log('Password entered. Waiting for login success...');
+
+    // Ждем, пока страница перейдет в режим успешного логина или проверим ошибки
+    await page.waitForNavigation({ waitUntil: 'networkidle2' });
+
+    const loginError = await page.evaluate(() => {
+      const el = document.querySelector('div[role="alert"]')?.textContent;
+      return el || '';
+    });
+
+    if (
+      loginError.toLowerCase().includes('wrong') ||
+      loginError.toLowerCase().includes('неправильный')
+    ) {
+      this.logger.warn('Login failed: ' + loginError);
+      return { result: { success: false, error: loginError }, page };
+    }
+
+    // Проверяем на 2FA
+    try {
+      await page.waitForSelector('input[data-testid="ocfEnterTextTextInput"]', {
+        timeout: 5000,
+      });
+      this.logger.warn('2FA required after password input');
+      return { result: { twoFactorRequired: true }, page, password };
+    } catch {
+      this.logger.log('Login successful.');
+      return { readyForPassword: false, success: true, page };
     }
   }
 
