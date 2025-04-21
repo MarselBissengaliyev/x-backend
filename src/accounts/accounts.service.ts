@@ -57,7 +57,7 @@ export class AccountsService {
     }
   }
 
-  async submitCode(sessionId: string, code: string) {
+  async submitCode(sessionId: string, code: string, login: string) {
     this.logger.log(`Submitting 2FA code for session ID: ${sessionId}`);
     const session = this.sessions.get(sessionId);
     if (!session) {
@@ -67,7 +67,7 @@ export class AccountsService {
 
     const { page, data } = session;
 
-    await this.puppeteerService.submitCode({ code, page });
+    await this.puppeteerService.submitCode({ code, page, login });
 
     await this.prisma.account.create({
       data: {

@@ -51,7 +51,8 @@ export class PuppeteerService {
     const isProd = process.env.NODE_ENV === 'production';
 
     const browser = await puppeteer.launch({
-      executablePath: process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
+      executablePath:
+        process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
       headless: isProd, // true на проде, false — локально
       args,
     });
@@ -138,77 +139,49 @@ export class PuppeteerService {
     }
 
     this.logger.log('Waiting for 2FA prompt or login success...');
+    this.logger.log('Waiting for 2FA prompt or login success...');
     try {
       await page.waitForSelector('input[data-testid="ocfEnterTextTextInput"]', {
         timeout: 5000,
       });
       this.logger.warn('2FA required');
-      this.logger.warn(
-        '2FA required. Waiting for user to input code in browser or call submitCode...',
-      );
-
-      let twoFACompleted = false;
-      const maxWaitTime = 180000; // 3 минуты
-      const checkInterval = 2000;
-      const startTime = Date.now();
-
-      while (!twoFACompleted && Date.now() - startTime < maxWaitTime) {
-        try {
-          await page.waitForNavigation({ timeout: checkInterval });
-          this.logger.log('2FA completed via manual input in browser');
-          twoFACompleted = true;
-        } catch {
-          // still waiting
-        }
-      }
-
-      if (twoFACompleted) {
-        try {
-          const context = page.browserContext();
-          const cookies = await context.cookies();
-          const cookiesDir = 'cookies';
-          if (!fs.existsSync(cookiesDir)) fs.mkdirSync(cookiesDir);
-          await fs.promises.writeFile(
-            `${cookiesDir}/${login}.json`,
-            JSON.stringify(cookies, null, 2),
-          );
-          this.logger.log('Cookies saved after manual 2FA');
-        } catch (e) {
-          this.logger.error('Error saving cookies after manual 2FA', e);
-        }
-
-        return { result: { success: true }, page };
-      } else {
-        this.logger.warn(
-          '2FA still required – awaiting code submission via API',
-        );
-        return { result: { twoFactorRequired: true }, page };
-      }
+      return { result: { twoFactorRequired: true }, page };
     } catch {
-      try {
-        const context = page.browserContext();
-        const cookies = await context.cookies();
-        const cookiesDir = 'cookies';
-        if (!fs.existsSync(cookiesDir)) fs.mkdirSync(cookiesDir);
-        await fs.promises.writeFile(
-          `${cookiesDir}/${login}.json`,
-          JSON.stringify(cookies, null, 2),
-        );
-        this.logger.log('Cookies saved');
-      } catch (e) {
-        this.logger.error('Error saving cookies', e);
-      }
-
+      this.logger.log('Login successful without 2FA');
       return { result: { success: true }, page };
     }
   }
 
-  async submitCode({ code, page }: { code: string; page: puppeteer.Page }) {
+  async submitCode({
+    code,
+    page,
+    login,
+  }: {
+    code: string;
+    page: puppeteer.Page;
+    login: string;
+  }) {
     this.logger.log('Submitting 2FA code...');
     await page.type('input[data-testid="ocfEnterTextTextInput"]', code);
     await page.click('[data-testid="ocfEnterTextNextButton"]');
     await page.waitForNavigation();
     this.logger.log('2FA completed, navigation successful');
+
+    // Сохранение cookies после успешного ввода кода
+    try {
+      const context = page.browserContext();
+      const cookies = await context.cookies();
+      const cookiesDir = 'cookies';
+      if (!fs.existsSync(cookiesDir)) fs.mkdirSync(cookiesDir);
+      await fs.promises.writeFile(
+        `${cookiesDir}/${login}.json`, // Сохраняем cookies по URL
+        JSON.stringify(cookies, null, 2),
+      );
+      this.logger.log('Cookies saved after submitting 2FA code');
+    } catch (e) {
+      this.logger.error('Error saving cookies after submitting 2FA code', e);
+    }
+
     return { success: true };
   }
 

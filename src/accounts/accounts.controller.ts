@@ -14,9 +14,9 @@ export class AccountsController {
   }
 
   @Post('submit-code')
-  async submitCode(@Body() body: { sessionId: string; code: string }) {
-    const { sessionId, code } = body;
-    return this.accountService.submitCode(sessionId, code);
+  async submitCode(@Body() body: { sessionId: string; code: string; login: string }) {
+    const { sessionId, code, login } = body;
+    return this.accountService.submitCode(sessionId, code, login);
   }
 
   @Get()
