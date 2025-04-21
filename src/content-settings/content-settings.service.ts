@@ -18,24 +18,36 @@ export class ContentSettingsService {
   }
 
   async create(data: CreateContentSettingDto) {
-    this.logger.log('Creating or updating content setting...');
+    this.logger.log('Создание или обновление content setting...');
     try {
       const result = await this.prisma.contentSetting.upsert({
         where: {
-          // Здесь укажите уникальное поле для поиска записи, например, id или какое-то другое уникальное поле
-          accountId: data.accountId,
+          accountId: data.accountId,  // Уникальное поле для поиска записи
         },
-        update: data, // Если запись существует, она будет обновлена
-        create: data, // Если записи нет, она будет создана
+        update: data,  // Если запись существует, она будет обновлена
+        create: {
+          promptText: data.promptText,
+          promptImage: data.promptImage,
+          promptHashtags: data.promptHashtags,
+          imageSource: data.imageSource,
+          targetUrl: data.targetUrl,
+          autoPost: data.autoPost,
+          cronExpression: data.cronExpression,
+          promotedOnly: data.promotedOnly,
+          useAiOnImage: data.useAiOnImage,
+          account: {
+            connect: { id: data.accountId }, // Устанавливаем связь с существующим аккаунтом
+          },
+        },
       });
-      this.logger.log('Content setting processed successfully');
+      this.logger.log('Content setting успешно обработан');
       return result;
     } catch (error) {
-      this.logger.error('Failed to process content setting', error.stack);
+      this.logger.error('Не удалось обработать content setting', error.stack);
       throw error;
     }
   }
-
+  
   async generate({ prompt, type }: GenerateDto): Promise<{ result: string }> {
     this.logger.log(
       `Генерация контента типа "${type}" с промптом: "${prompt}"`,

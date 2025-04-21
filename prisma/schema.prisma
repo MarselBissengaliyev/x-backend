@@ -44,14 +44,14 @@ model Post {
 model ContentSetting {
   id             String   @id @default(uuid())
   accountId      String   @unique
-  promptText     String
+  promptText     String?
   promptImage    String?
   promptHashtags String?
   imageSource    String?
-  targetUrl      String
-  autoPost       Boolean  @default(false)
-  cronExpression String
-  promotedOnly   Boolean  @default(false)
+  targetUrl      String?
+  autoPost       Boolean?  @default(false)
+  cronExpression String?
+  promotedOnly   Boolean?  @default(false)
   useAiOnImage   Boolean? // Только для метода 2
 
   account Account @relation(fields: [accountId], references: [id])

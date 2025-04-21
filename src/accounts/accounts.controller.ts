@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { CreateAccountDto } from './accounts.dto';
 import { AccountsService } from './accounts.service';
-import { Request } from 'express';
 
 @Controller('accounts')
 export class AccountsController {
@@ -14,7 +14,7 @@ export class AccountsController {
   }
 
   @Post('submit-code')
-  async submitCode(@Body() body: { sessionId: string, code: string }) {
+  async submitCode(@Body() body: { sessionId: string; code: string }) {
     const { sessionId, code } = body;
     return this.accountService.submitCode(sessionId, code);
   }
@@ -22,5 +22,10 @@ export class AccountsController {
   @Get()
   async findAll() {
     return this.accountService.findAll();
+  }
+
+  @Get(':id')
+  async findById(@Param('id') id: string) {
+    return this.accountService.findById(id);
   }
 }

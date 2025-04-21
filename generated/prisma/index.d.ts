@@ -3692,14 +3692,14 @@ export namespace Prisma {
   export type ContentSettingGroupByOutputType = {
     id: string
     accountId: string
-    promptText: string
+    promptText: string | null
     promptImage: string | null
     promptHashtags: string | null
     imageSource: string | null
-    targetUrl: string
-    autoPost: boolean
-    cronExpression: string
-    promotedOnly: boolean
+    targetUrl: string | null
+    autoPost: boolean | null
+    cronExpression: string | null
+    promotedOnly: boolean | null
     useAiOnImage: boolean | null
     _count: ContentSettingCountAggregateOutputType | null
     _min: ContentSettingMinAggregateOutputType | null
@@ -3798,14 +3798,14 @@ export namespace Prisma {
     scalars: $Extensions.GetPayloadResult<{
       id: string
       accountId: string
-      promptText: string
+      promptText: string | null
       promptImage: string | null
       promptHashtags: string | null
       imageSource: string | null
-      targetUrl: string
-      autoPost: boolean
-      cronExpression: string
-      promotedOnly: boolean
+      targetUrl: string | null
+      autoPost: boolean | null
+      cronExpression: string | null
+      promotedOnly: boolean | null
       useAiOnImage: boolean | null
     }, ExtArgs["result"]["contentSetting"]>
     composites: {}
@@ -6071,14 +6071,14 @@ export namespace Prisma {
     NOT?: ContentSettingWhereInput | ContentSettingWhereInput[]
     id?: StringFilter<"ContentSetting"> | string
     accountId?: StringFilter<"ContentSetting"> | string
-    promptText?: StringFilter<"ContentSetting"> | string
+    promptText?: StringNullableFilter<"ContentSetting"> | string | null
     promptImage?: StringNullableFilter<"ContentSetting"> | string | null
     promptHashtags?: StringNullableFilter<"ContentSetting"> | string | null
     imageSource?: StringNullableFilter<"ContentSetting"> | string | null
-    targetUrl?: StringFilter<"ContentSetting"> | string
-    autoPost?: BoolFilter<"ContentSetting"> | boolean
-    cronExpression?: StringFilter<"ContentSetting"> | string
-    promotedOnly?: BoolFilter<"ContentSetting"> | boolean
+    targetUrl?: StringNullableFilter<"ContentSetting"> | string | null
+    autoPost?: BoolNullableFilter<"ContentSetting"> | boolean | null
+    cronExpression?: StringNullableFilter<"ContentSetting"> | string | null
+    promotedOnly?: BoolNullableFilter<"ContentSetting"> | boolean | null
     useAiOnImage?: BoolNullableFilter<"ContentSetting"> | boolean | null
     account?: XOR<AccountScalarRelationFilter, AccountWhereInput>
   }
@@ -6086,14 +6086,14 @@ export namespace Prisma {
   export type ContentSettingOrderByWithRelationInput = {
     id?: SortOrder
     accountId?: SortOrder
-    promptText?: SortOrder
+    promptText?: SortOrderInput | SortOrder
     promptImage?: SortOrderInput | SortOrder
     promptHashtags?: SortOrderInput | SortOrder
     imageSource?: SortOrderInput | SortOrder
-    targetUrl?: SortOrder
-    autoPost?: SortOrder
-    cronExpression?: SortOrder
-    promotedOnly?: SortOrder
+    targetUrl?: SortOrderInput | SortOrder
+    autoPost?: SortOrderInput | SortOrder
+    cronExpression?: SortOrderInput | SortOrder
+    promotedOnly?: SortOrderInput | SortOrder
     useAiOnImage?: SortOrderInput | SortOrder
     account?: AccountOrderByWithRelationInput
   }
@@ -6104,14 +6104,14 @@ export namespace Prisma {
     AND?: ContentSettingWhereInput | ContentSettingWhereInput[]
     OR?: ContentSettingWhereInput[]
     NOT?: ContentSettingWhereInput | ContentSettingWhereInput[]
-    promptText?: StringFilter<"ContentSetting"> | string
+    promptText?: StringNullableFilter<"ContentSetting"> | string | null
     promptImage?: StringNullableFilter<"ContentSetting"> | string | null
     promptHashtags?: StringNullableFilter<"ContentSetting"> | string | null
     imageSource?: StringNullableFilter<"ContentSetting"> | string | null
-    targetUrl?: StringFilter<"ContentSetting"> | string
-    autoPost?: BoolFilter<"ContentSetting"> | boolean
-    cronExpression?: StringFilter<"ContentSetting"> | string
-    promotedOnly?: BoolFilter<"ContentSetting"> | boolean
+    targetUrl?: StringNullableFilter<"ContentSetting"> | string | null
+    autoPost?: BoolNullableFilter<"ContentSetting"> | boolean | null
+    cronExpression?: StringNullableFilter<"ContentSetting"> | string | null
+    promotedOnly?: BoolNullableFilter<"ContentSetting"> | boolean | null
     useAiOnImage?: BoolNullableFilter<"ContentSetting"> | boolean | null
     account?: XOR<AccountScalarRelationFilter, AccountWhereInput>
   }, "id" | "accountId">
@@ -6119,14 +6119,14 @@ export namespace Prisma {
   export type ContentSettingOrderByWithAggregationInput = {
     id?: SortOrder
     accountId?: SortOrder
-    promptText?: SortOrder
+    promptText?: SortOrderInput | SortOrder
     promptImage?: SortOrderInput | SortOrder
     promptHashtags?: SortOrderInput | SortOrder
     imageSource?: SortOrderInput | SortOrder
-    targetUrl?: SortOrder
-    autoPost?: SortOrder
-    cronExpression?: SortOrder
-    promotedOnly?: SortOrder
+    targetUrl?: SortOrderInput | SortOrder
+    autoPost?: SortOrderInput | SortOrder
+    cronExpression?: SortOrderInput | SortOrder
+    promotedOnly?: SortOrderInput | SortOrder
     useAiOnImage?: SortOrderInput | SortOrder
     _count?: ContentSettingCountOrderByAggregateInput
     _max?: ContentSettingMaxOrderByAggregateInput
@@ -6139,14 +6139,14 @@ export namespace Prisma {
     NOT?: ContentSettingScalarWhereWithAggregatesInput | ContentSettingScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"ContentSetting"> | string
     accountId?: StringWithAggregatesFilter<"ContentSetting"> | string
-    promptText?: StringWithAggregatesFilter<"ContentSetting"> | string
+    promptText?: StringNullableWithAggregatesFilter<"ContentSetting"> | string | null
     promptImage?: StringNullableWithAggregatesFilter<"ContentSetting"> | string | null
     promptHashtags?: StringNullableWithAggregatesFilter<"ContentSetting"> | string | null
     imageSource?: StringNullableWithAggregatesFilter<"ContentSetting"> | string | null
-    targetUrl?: StringWithAggregatesFilter<"ContentSetting"> | string
-    autoPost?: BoolWithAggregatesFilter<"ContentSetting"> | boolean
-    cronExpression?: StringWithAggregatesFilter<"ContentSetting"> | string
-    promotedOnly?: BoolWithAggregatesFilter<"ContentSetting"> | boolean
+    targetUrl?: StringNullableWithAggregatesFilter<"ContentSetting"> | string | null
+    autoPost?: BoolNullableWithAggregatesFilter<"ContentSetting"> | boolean | null
+    cronExpression?: StringNullableWithAggregatesFilter<"ContentSetting"> | string | null
+    promotedOnly?: BoolNullableWithAggregatesFilter<"ContentSetting"> | boolean | null
     useAiOnImage?: BoolNullableWithAggregatesFilter<"ContentSetting"> | boolean | null
   }
 
@@ -6377,14 +6377,14 @@ export namespace Prisma {
 
   export type ContentSettingCreateInput = {
     id?: string
-    promptText: string
+    promptText?: string | null
     promptImage?: string | null
     promptHashtags?: string | null
     imageSource?: string | null
-    targetUrl: string
-    autoPost?: boolean
-    cronExpression: string
-    promotedOnly?: boolean
+    targetUrl?: string | null
+    autoPost?: boolean | null
+    cronExpression?: string | null
+    promotedOnly?: boolean | null
     useAiOnImage?: boolean | null
     account: AccountCreateNestedOneWithoutContentSettingsInput
   }
@@ -6392,27 +6392,27 @@ export namespace Prisma {
   export type ContentSettingUncheckedCreateInput = {
     id?: string
     accountId: string
-    promptText: string
+    promptText?: string | null
     promptImage?: string | null
     promptHashtags?: string | null
     imageSource?: string | null
-    targetUrl: string
-    autoPost?: boolean
-    cronExpression: string
-    promotedOnly?: boolean
+    targetUrl?: string | null
+    autoPost?: boolean | null
+    cronExpression?: string | null
+    promotedOnly?: boolean | null
     useAiOnImage?: boolean | null
   }
 
   export type ContentSettingUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
-    promptText?: StringFieldUpdateOperationsInput | string
+    promptText?: NullableStringFieldUpdateOperationsInput | string | null
     promptImage?: NullableStringFieldUpdateOperationsInput | string | null
     promptHashtags?: NullableStringFieldUpdateOperationsInput | string | null
     imageSource?: NullableStringFieldUpdateOperationsInput | string | null
-    targetUrl?: StringFieldUpdateOperationsInput | string
-    autoPost?: BoolFieldUpdateOperationsInput | boolean
-    cronExpression?: StringFieldUpdateOperationsInput | string
-    promotedOnly?: BoolFieldUpdateOperationsInput | boolean
+    targetUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    autoPost?: NullableBoolFieldUpdateOperationsInput | boolean | null
+    cronExpression?: NullableStringFieldUpdateOperationsInput | string | null
+    promotedOnly?: NullableBoolFieldUpdateOperationsInput | boolean | null
     useAiOnImage?: NullableBoolFieldUpdateOperationsInput | boolean | null
     account?: AccountUpdateOneRequiredWithoutContentSettingsNestedInput
   }
@@ -6420,55 +6420,55 @@ export namespace Prisma {
   export type ContentSettingUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     accountId?: StringFieldUpdateOperationsInput | string
-    promptText?: StringFieldUpdateOperationsInput | string
+    promptText?: NullableStringFieldUpdateOperationsInput | string | null
     promptImage?: NullableStringFieldUpdateOperationsInput | string | null
     promptHashtags?: NullableStringFieldUpdateOperationsInput | string | null
     imageSource?: NullableStringFieldUpdateOperationsInput | string | null
-    targetUrl?: StringFieldUpdateOperationsInput | string
-    autoPost?: BoolFieldUpdateOperationsInput | boolean
-    cronExpression?: StringFieldUpdateOperationsInput | string
-    promotedOnly?: BoolFieldUpdateOperationsInput | boolean
+    targetUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    autoPost?: NullableBoolFieldUpdateOperationsInput | boolean | null
+    cronExpression?: NullableStringFieldUpdateOperationsInput | string | null
+    promotedOnly?: NullableBoolFieldUpdateOperationsInput | boolean | null
     useAiOnImage?: NullableBoolFieldUpdateOperationsInput | boolean | null
   }
 
   export type ContentSettingCreateManyInput = {
     id?: string
     accountId: string
-    promptText: string
+    promptText?: string | null
     promptImage?: string | null
     promptHashtags?: string | null
     imageSource?: string | null
-    targetUrl: string
-    autoPost?: boolean
-    cronExpression: string
-    promotedOnly?: boolean
+    targetUrl?: string | null
+    autoPost?: boolean | null
+    cronExpression?: string | null
+    promotedOnly?: boolean | null
     useAiOnImage?: boolean | null
   }
 
   export type ContentSettingUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
-    promptText?: StringFieldUpdateOperationsInput | string
+    promptText?: NullableStringFieldUpdateOperationsInput | string | null
     promptImage?: NullableStringFieldUpdateOperationsInput | string | null
     promptHashtags?: NullableStringFieldUpdateOperationsInput | string | null
     imageSource?: NullableStringFieldUpdateOperationsInput | string | null
-    targetUrl?: StringFieldUpdateOperationsInput | string
-    autoPost?: BoolFieldUpdateOperationsInput | boolean
-    cronExpression?: StringFieldUpdateOperationsInput | string
-    promotedOnly?: BoolFieldUpdateOperationsInput | boolean
+    targetUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    autoPost?: NullableBoolFieldUpdateOperationsInput | boolean | null
+    cronExpression?: NullableStringFieldUpdateOperationsInput | string | null
+    promotedOnly?: NullableBoolFieldUpdateOperationsInput | boolean | null
     useAiOnImage?: NullableBoolFieldUpdateOperationsInput | boolean | null
   }
 
   export type ContentSettingUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
     accountId?: StringFieldUpdateOperationsInput | string
-    promptText?: StringFieldUpdateOperationsInput | string
+    promptText?: NullableStringFieldUpdateOperationsInput | string | null
     promptImage?: NullableStringFieldUpdateOperationsInput | string | null
     promptHashtags?: NullableStringFieldUpdateOperationsInput | string | null
     imageSource?: NullableStringFieldUpdateOperationsInput | string | null
-    targetUrl?: StringFieldUpdateOperationsInput | string
-    autoPost?: BoolFieldUpdateOperationsInput | boolean
-    cronExpression?: StringFieldUpdateOperationsInput | string
-    promotedOnly?: BoolFieldUpdateOperationsInput | boolean
+    targetUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    autoPost?: NullableBoolFieldUpdateOperationsInput | boolean | null
+    cronExpression?: NullableStringFieldUpdateOperationsInput | string | null
+    promotedOnly?: NullableBoolFieldUpdateOperationsInput | boolean | null
     useAiOnImage?: NullableBoolFieldUpdateOperationsInput | boolean | null
   }
 
@@ -7297,27 +7297,27 @@ export namespace Prisma {
 
   export type ContentSettingCreateWithoutAccountInput = {
     id?: string
-    promptText: string
+    promptText?: string | null
     promptImage?: string | null
     promptHashtags?: string | null
     imageSource?: string | null
-    targetUrl: string
-    autoPost?: boolean
-    cronExpression: string
-    promotedOnly?: boolean
+    targetUrl?: string | null
+    autoPost?: boolean | null
+    cronExpression?: string | null
+    promotedOnly?: boolean | null
     useAiOnImage?: boolean | null
   }
 
   export type ContentSettingUncheckedCreateWithoutAccountInput = {
     id?: string
-    promptText: string
+    promptText?: string | null
     promptImage?: string | null
     promptHashtags?: string | null
     imageSource?: string | null
-    targetUrl: string
-    autoPost?: boolean
-    cronExpression: string
-    promotedOnly?: boolean
+    targetUrl?: string | null
+    autoPost?: boolean | null
+    cronExpression?: string | null
+    promotedOnly?: boolean | null
     useAiOnImage?: boolean | null
   }
 
@@ -7395,27 +7395,27 @@ export namespace Prisma {
 
   export type ContentSettingUpdateWithoutAccountInput = {
     id?: StringFieldUpdateOperationsInput | string
-    promptText?: StringFieldUpdateOperationsInput | string
+    promptText?: NullableStringFieldUpdateOperationsInput | string | null
     promptImage?: NullableStringFieldUpdateOperationsInput | string | null
     promptHashtags?: NullableStringFieldUpdateOperationsInput | string | null
     imageSource?: NullableStringFieldUpdateOperationsInput | string | null
-    targetUrl?: StringFieldUpdateOperationsInput | string
-    autoPost?: BoolFieldUpdateOperationsInput | boolean
-    cronExpression?: StringFieldUpdateOperationsInput | string
-    promotedOnly?: BoolFieldUpdateOperationsInput | boolean
+    targetUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    autoPost?: NullableBoolFieldUpdateOperationsInput | boolean | null
+    cronExpression?: NullableStringFieldUpdateOperationsInput | string | null
+    promotedOnly?: NullableBoolFieldUpdateOperationsInput | boolean | null
     useAiOnImage?: NullableBoolFieldUpdateOperationsInput | boolean | null
   }
 
   export type ContentSettingUncheckedUpdateWithoutAccountInput = {
     id?: StringFieldUpdateOperationsInput | string
-    promptText?: StringFieldUpdateOperationsInput | string
+    promptText?: NullableStringFieldUpdateOperationsInput | string | null
     promptImage?: NullableStringFieldUpdateOperationsInput | string | null
     promptHashtags?: NullableStringFieldUpdateOperationsInput | string | null
     imageSource?: NullableStringFieldUpdateOperationsInput | string | null
-    targetUrl?: StringFieldUpdateOperationsInput | string
-    autoPost?: BoolFieldUpdateOperationsInput | boolean
-    cronExpression?: StringFieldUpdateOperationsInput | string
-    promotedOnly?: BoolFieldUpdateOperationsInput | boolean
+    targetUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    autoPost?: NullableBoolFieldUpdateOperationsInput | boolean | null
+    cronExpression?: NullableStringFieldUpdateOperationsInput | string | null
+    promotedOnly?: NullableBoolFieldUpdateOperationsInput | boolean | null
     useAiOnImage?: NullableBoolFieldUpdateOperationsInput | boolean | null
   }
 

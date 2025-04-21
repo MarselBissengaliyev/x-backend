@@ -1,6 +1,7 @@
-import { Body, Controller, Logger, Post } from '@nestjs/common';
+import { Body, Controller, Logger, Post, Req } from '@nestjs/common';
 import { PuppeteerService } from './puppeteer.service';
 import { PostDto } from './puppeteer.dto';
+import { Request } from 'express';
 
 @Controller('puppeteer')
 export class PuppeteerController {
@@ -8,9 +9,10 @@ export class PuppeteerController {
   constructor(private puppeteerService: PuppeteerService) {}
 
   @Post('submit-post')
-  async submitPost(@Body() postDto: PostDto) {
+  async submitPost(@Body() postDto: PostDto, @Req() req: Request) {
     this.logger.log('Submitting post to X Composer...');
-    const result = await this.puppeteerService.submitPost(postDto);
+    const userAgent = req.headers['user-agent'] || 'default';
+    const result = await this.puppeteerService.submitPost(postDto, userAgent);
 
     if (result.success) {
       this.logger.log('Post successfully submitted');

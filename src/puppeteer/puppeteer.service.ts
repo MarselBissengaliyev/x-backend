@@ -1,13 +1,15 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { Post } from 'generated/prisma';
+import * as fs from 'fs';
 import * as puppeteer from 'puppeteer-core';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { LoginDto, PostDto } from './puppeteer.dto';
+import { delay, downloadImageToTempFile } from './puppeteer.utils';
 
 @Injectable()
 export class PuppeteerService {
   private readonly logger = new Logger(PuppeteerService.name);
-  private browser: puppeteer.Browser | null = null;
-  private page: puppeteer.Page | null = null;
+
+  constructor(private prisma: PrismaService) {}
 
   async login({
     login,
@@ -20,7 +22,7 @@ export class PuppeteerService {
 
     this.logger.log('Launching browser with userAgent: ' + userAgent);
 
-    const args = ['--no-sandbox', '--disable-setuid-sandbox'];
+    const args = ['--no-sandbox', '--disable-setuid-sandbox', '--incognito'];
     let proxyAuth: { username: string; password: string } | null = null;
 
     if (proxy) {
@@ -78,20 +80,20 @@ export class PuppeteerService {
     // 🔐 Проверка на "Unusual login activity"
     try {
       await page.waitForSelector('h1[role="heading"]', { timeout: 3000 });
-    
+
       const challengeText = await page.evaluate(() => {
         const el = document.querySelector('h1[role="heading"]')?.textContent;
         return el || '';
       });
-    
+
       if (challengeText.includes('Enter your phone number or username')) {
         this.logger.warn(
           'Unusual login activity detected, waiting for user input...',
         );
-    
+
         // Ждём появление поля
         await page.waitForSelector('input[name="text"]', { timeout: 10000 });
-    
+
         // Ждём, пока пользователь введёт что-то в поле (бесконечно)
         let inputEntered = false;
         while (!inputEntered) {
@@ -107,13 +109,12 @@ export class PuppeteerService {
             await delay(1000); // Пауза перед повторной проверкой
           }
         }
-    
+
         await delay(2000); // Небольшая пауза после нажатия Enter
       }
     } catch (err) {
       this.logger.log('No unusual activity challenge detected');
     }
-    
 
     this.logger.log('Typing password...');
     await page.waitForSelector('input[name="password"]'); // Без timeout — ждём сколько нужно
@@ -140,9 +141,62 @@ export class PuppeteerService {
         timeout: 5000,
       });
       this.logger.warn('2FA required');
-      return { result: { twoFactorRequired: true }, page };
+      this.logger.warn(
+        '2FA required. Waiting for user to input code in browser or call submitCode...',
+      );
+
+      let twoFACompleted = false;
+      const maxWaitTime = 180000; // 3 минуты
+      const checkInterval = 2000;
+      const startTime = Date.now();
+
+      while (!twoFACompleted && Date.now() - startTime < maxWaitTime) {
+        try {
+          await page.waitForNavigation({ timeout: checkInterval });
+          this.logger.log('2FA completed via manual input in browser');
+          twoFACompleted = true;
+        } catch {
+          // still waiting
+        }
+      }
+
+      if (twoFACompleted) {
+        try {
+          const context = page.browserContext();
+          const cookies = await context.cookies();
+          const cookiesDir = 'cookies';
+          if (!fs.existsSync(cookiesDir)) fs.mkdirSync(cookiesDir);
+          await fs.promises.writeFile(
+            `${cookiesDir}/${login}.json`,
+            JSON.stringify(cookies, null, 2),
+          );
+          this.logger.log('Cookies saved after manual 2FA');
+        } catch (e) {
+          this.logger.error('Error saving cookies after manual 2FA', e);
+        }
+
+        return { result: { success: true }, page };
+      } else {
+        this.logger.warn(
+          '2FA still required – awaiting code submission via API',
+        );
+        return { result: { twoFactorRequired: true }, page };
+      }
     } catch {
-      this.logger.log('Login successful without 2FA');
+      try {
+        const context = page.browserContext();
+        const cookies = await context.cookies();
+        const cookiesDir = 'cookies';
+        if (!fs.existsSync(cookiesDir)) fs.mkdirSync(cookiesDir);
+        await fs.promises.writeFile(
+          `${cookiesDir}/${login}.json`,
+          JSON.stringify(cookies, null, 2),
+        );
+        this.logger.log('Cookies saved');
+      } catch (e) {
+        this.logger.error('Error saving cookies', e);
+      }
+
       return { result: { success: true }, page };
     }
   }
@@ -156,50 +210,210 @@ export class PuppeteerService {
     return { success: true };
   }
 
-  async submitPost(post: PostDto) {
-    if (!this.page) {
-      this.logger.error('No active session for posting');
-      throw new Error('No active session');
-    }
+  async submitPost(post: PostDto, userAgent: string) {
+    this.logger.log(`Starting to submit post: ${JSON.stringify(post)}`);
 
-    this.logger.log('Navigating to Composer...');
-    await this.page.goto('https://ads.x.com/composer');
+    const account = await this.getAccountOrThrow(post.accountId);
 
-    this.logger.log('Filling in post content...');
-    await this.page.type('#content-text-field', post.content);
+    const browser = await this.launchBrowser();
+    const page = await browser.newPage();
+    await page.setUserAgent(userAgent);
+
+    await this.loadCookies(page, account.login);
+    await this.navigateToComposer(page);
+
+    await this.closeWelcomeModalIfExists(page);
+    await this.insertPostContent(page, post);
+
+    await this.togglePromotion(page, post.promoted || false);
 
     if (post.imageUrl) {
-      this.logger.log('Adding image URL');
-      await this.page.type('#image-url-field', post.imageUrl);
-    }
-
-    if (post.hashtags) {
-      this.logger.log('Adding hashtags');
-      await this.page.type('#hashtags-field', post.hashtags);
-    }
-
-    if (post.targetUrl) {
-      this.logger.log('Adding target URL');
-      await this.page.type('#target-url-field', post.targetUrl);
-    }
-
-    if (post.promoted) {
-      this.logger.log('Setting post as Promoted');
-      const promotedToggle = await this.page.$('#promoted-toggle');
-      if (promotedToggle) {
-        await promotedToggle.click();
-      } else {
-        this.logger.warn('Promoted toggle not found');
+      const success = await this.handleMediaUpload(page, post.imageUrl);
+      if (!success) {
+        await browser.close();
+        return { success: false, message: 'Media upload failed' };
       }
     }
 
-    this.logger.log('Clicking publish...');
-    await this.page.click('#publish-button');
+    await this.publishPost(page);
+    await this.savePostToDb(post);
 
-    this.logger.log('Waiting for post confirmation...');
-    await this.page.waitForSelector('#post-confirmation', { visible: true });
-
-    this.logger.log('Post published successfully');
+    await browser.close();
     return { success: true };
+  }
+
+  private async getAccountOrThrow(accountId: string) {
+    const account = await this.prisma.account.findUnique({
+      where: { id: accountId },
+    });
+    if (!account) {
+      this.logger.error(`Account not found: ${accountId}`);
+      throw new BadRequestException('Аккаунт не найден');
+    }
+    this.logger.log(`Account found: ${account.login}`);
+    return account;
+  }
+
+  private async launchBrowser() {
+    return puppeteer.launch({
+      executablePath: process.env.CHROMIUM_EXEC_PATH,
+      headless: false,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+  }
+
+  private async loadCookies(page: puppeteer.Page, login: string) {
+    const cookiePath = `cookies/${login}.json`;
+    if (!fs.existsSync(cookiePath)) {
+      throw new Error('Сессия не найдена. Сначала выполните login().');
+    }
+
+    const cookies = JSON.parse(await fs.promises.readFile(cookiePath, 'utf-8'));
+    const context = page.browserContext();
+    await context.setCookie(...cookies);
+    this.logger.log('Cookies loaded');
+  }
+
+  private async navigateToComposer(page: puppeteer.Page) {
+    await page.goto('https://ads.x.com', { waitUntil: 'networkidle2' });
+
+    const match = page.url().match(/analytics\/([^/]+)\/campaigns/);
+    if (!match) throw new Error('Ads Account ID не найден');
+    const adsAccountId = match[1];
+
+    await page.goto(`https://ads.x.com/composer/${adsAccountId}/carousel`, {
+      waitUntil: 'networkidle2',
+    });
+  }
+
+  private async closeWelcomeModalIfExists(page: puppeteer.Page) {
+    const modalCloseButton = await page.$(
+      '.Dialog--modal.Dialog--withClose.is-open button[aria-label="Close"]',
+    );
+    if (modalCloseButton) {
+      await modalCloseButton.click();
+      await page.waitForSelector('.Dialog--modal.Dialog--withClose.is-open', {
+        hidden: true,
+        timeout: 5000,
+      });
+    }
+  }
+
+  private async insertPostContent(page: puppeteer.Page, post: PostDto) {
+    await page.waitForSelector('.TweetTextInput-editor', { timeout: 10000 });
+
+    const fullContent = [
+      post.content.trim(),
+      post.hashtags?.trim(),
+      post.targetUrl ? `Check it out: ${post.targetUrl}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    await page.evaluate((content: string) => {
+      const el = document.querySelector(
+        '.TweetTextInput-editor',
+      ) as HTMLElement;
+      if (!el) return;
+
+      el.focus();
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      document.execCommand('delete');
+
+      const lines = content.split('\n');
+      for (const line of lines) {
+        document.execCommand('insertText', false, line);
+        document.execCommand('insertParagraph');
+      }
+    }, fullContent);
+  }
+
+  private async togglePromotion(page: puppeteer.Page, promoted: boolean) {
+    const checkbox = await page.$(
+      '[data-test-id="promotedOnlyCheckbox"] .Checkbox-input',
+    );
+    if (!checkbox) return;
+
+    const isChecked = await checkbox.evaluate(
+      (el: HTMLInputElement) => el.checked,
+    );
+
+    if (promoted && !isChecked) {
+      await checkbox.click();
+      await delay(500);
+    } else if (!promoted && isChecked) {
+      await checkbox.click();
+      await delay(500);
+    }
+  }
+
+  private async handleMediaUpload(
+    page: puppeteer.Page,
+    imageUrl: string,
+  ): Promise<boolean> {
+    try {
+      const selector = '[data-testid="adFormatsGroup-SINGLE_MEDIA"]';
+      const singleMediaElement = await page.waitForSelector(selector, {
+        timeout: 10000,
+      });
+      if (!singleMediaElement) throw new Error('Single media not found');
+
+      await page.evaluate((sel) => {
+        const el = document.querySelector(sel);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, selector);
+
+      await singleMediaElement.focus();
+      await page.keyboard.press('Space');
+
+      await page.waitForSelector('button[data-test-id="addMediaButton"]', {
+        timeout: 10000,
+      });
+      await page.click('button[data-test-id="addMediaButton"]');
+
+      const localPath = await downloadImageToTempFile(imageUrl, 1200, 1200);
+      const input = (await page.waitForSelector(
+        '.FilePicker-callToActionFileInput',
+        { timeout: 10000 },
+      )) as puppeteer.ElementHandle<HTMLInputElement>;
+      if (!input) throw new Error('Image input not found');
+      await input.uploadFile(localPath);
+
+      await page.waitForSelector('button.Button--primary', { timeout: 10000 });
+      await page.waitForFunction(() => {
+        const btn = document.querySelector('button.Button--primary');
+        return btn && !btn.hasAttribute('disabled');
+      });
+
+      await page.click('button.Button--primary');
+      await fs.promises.unlink(localPath);
+
+      return true;
+    } catch (err) {
+      this.logger.error('Image upload error:', err);
+      return false;
+    }
+  }
+
+  private async publishPost(page: puppeteer.Page) {
+    await page.click('button[data-test-id="tweetSaveButton"]');
+    await delay(3000);
+  }
+
+  private async savePostToDb(post: PostDto) {
+    await this.prisma.post.create({
+      data: {
+        accountId: post.accountId,
+        content: post.content,
+        imageUrl: post.imageUrl,
+        hashtags: post.hashtags,
+        targetUrl: post.targetUrl,
+        promoted: post.promoted || undefined,
+      },
+    });
   }
 }

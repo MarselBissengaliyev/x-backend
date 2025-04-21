@@ -1,5 +1,4 @@
-import { IsString, IsOptional, IsBoolean, IsEnum, IsUrl, IsNotEmpty, IsUUID, Matches } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, IsUrl, IsUUID, Matches } from 'class-validator';
 
 export enum ContentType {
   TEXT = 'text',
@@ -22,8 +21,9 @@ export class CreateContentSettingDto {
   accountId: string;
 
   @IsString()
+  @IsOptional()
   @IsNotEmpty()
-  promptText: string;
+  promptText?: string;
 
   @IsOptional()
   @IsString()
@@ -38,15 +38,17 @@ export class CreateContentSettingDto {
   imageSource?: string;
 
   @IsUrl()
+  @IsOptional()
   @IsNotEmpty()
   targetUrl: string;
 
   @IsBoolean()
-  autoPost: boolean;
+  autoPost: boolean = false;
 
-  @Matches(/^(?:0|1|2) \d{1,2} \d{1,2} \d{1,2} \d{1,2} \d{1,2} \d{1,2}$/, {
-    message: 'Invalid cron expression format',
+  @Matches(/^(\*|([0-5]?\d)|\*\/[0-9]+) (\*|([0-1]?\d|2[0-3])|\*\/[0-9]+) (\*|([1-2]?\d|3[0-1])) (\*|(0?[1-9]|1[0-2])) (\*|[0-6])$/, {
+    message: 'Неверный формат CRON. Пример: */5 * * * *',
   })
+  @IsOptional()
   cronExpression: string;
 
   @IsBoolean()

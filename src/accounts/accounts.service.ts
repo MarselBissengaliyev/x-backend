@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Page } from 'puppeteer-core';
+import { PuppeteerService } from 'src/puppeteer/puppeteer.service';
 import { v4 as uuid } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
+import { isToday } from './account.utils';
 import { CreateAccountDto } from './accounts.dto';
-import { PuppeteerService } from 'src/puppeteer/puppeteer.service';
-import { Page } from 'puppeteer-core';
 
 @Injectable()
 export class AccountsService {
@@ -24,36 +25,37 @@ export class AccountsService {
         proxy: data.proxy,
         userAgent,
       });
-  
+
       // Проверяем, был ли логин успешным
       if (result.success === false) {
         this.logger.warn(`Login failed for login: ${data.login}`);
         return { success: false, error: 'Invalid login or password' };
       }
-  
+
       // Проверка на двухфакторную аутентификацию
       if (result.twoFactorRequired) {
         const sessionId = uuid();
         this.sessions.set(sessionId, { page, data });
-        this.logger.log(`Two-factor authentication required. Session ID: ${sessionId}`);
+        this.logger.log(
+          `Two-factor authentication required. Session ID: ${sessionId}`,
+        );
         return { twoFactorRequired: true, sessionId };
       }
-  
+
       // Создание аккаунта в базе данных
-      await this.prisma.account.create({
+      const account = await this.prisma.account.create({
         data: {
           id: uuid(),
           ...data,
         },
       });
       this.logger.log(`Account created successfully for login: ${data.login}`);
-      return { success: true };
+      return { success: true, id: account.id };
     } catch (err) {
       this.logger.error(`Login failed for login: ${data.login}`, err.stack);
       throw new Error('Логин не удался');
     }
   }
-  
 
   async submitCode(sessionId: string, code: string) {
     this.logger.log(`Submitting 2FA code for session ID: ${sessionId}`);
@@ -75,7 +77,9 @@ export class AccountsService {
     });
 
     this.sessions.delete(sessionId);
-    this.logger.log(`2FA successful and account created for session ID: ${sessionId}`);
+    this.logger.log(
+      `2FA successful and account created for session ID: ${sessionId}`,
+    );
 
     return { success: true };
   }
@@ -96,7 +100,8 @@ export class AccountsService {
       const accountsWithCounts = accounts.map((account) => ({
         ...account,
         totalPosts: account.posts.length, // Количество всех постов
-        postsToday: account.posts.filter((post) => isToday(post.createdAt)).length, // Количество постов за сегодня
+        postsToday: account.posts.filter((post) => isToday(post.createdAt))
+          .length, // Количество постов за сегодня
       }));
 
       this.logger.log(`Processed accounts with post counts`);
@@ -105,5 +110,13 @@ export class AccountsService {
       this.logger.error('Error fetching accounts', err.stack);
       throw new Error('Ошибка при получении аккаунтов');
     }
+  }
+
+  async findById(id: string) {
+    return this.prisma.account.findUnique({
+      where: {
+        id,
+      },
+    });
   }
 }

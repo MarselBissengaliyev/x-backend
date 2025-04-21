@@ -5,6 +5,10 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  Validate,
+  ValidationArguments,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
 
 export class LoginDto {
@@ -28,31 +32,61 @@ export class CodeDto {
   code: string; // Предположим, что код имеет длину 6 символов (например, для 2FA)
 }
 
+@ValidatorConstraint({ name: 'contentLength', async: false })
+export class ContentLengthValidator implements ValidatorConstraintInterface {
+  validate(_: any, args: ValidationArguments) {
+    const { content, hashtags, targetUrl } = args.object as any;
+
+    const pieces = [
+      content?.trim(),
+      hashtags?.trim(),
+      targetUrl ? `Check it out: ${targetUrl}` : null,
+    ].filter(Boolean);
+
+    const finalText = pieces.join('\n');
+    return finalText.length <= 279;
+  }
+
+  defaultMessage(args: ValidationArguments) {
+    return 'Total post content including hashtags and targetUrl must be 279 characters or fewer.';
+  }
+}
+
 export class PostDto {
+  @IsString()
+  accountId: string;
+
   @IsString({ message: 'Content must be a string.' })
   @IsNotEmpty({ message: 'Content cannot be empty.' })
+  @Validate(ContentLengthValidator) // <<< вот сюда
   content: string;
 
   @IsOptional()
   @IsString({ message: 'Image URL must be a string if provided.' })
   @IsUrl({})
-  imageUrl?: string | null; // Можно передавать null или undefined
+  imageUrl?: string | null;
 
   @IsOptional()
   @IsString({ message: 'Hashtags must be a string if provided.' })
-  hashtags?: string | null; // Можно передавать null или undefined
+  hashtags?: string | null;
 
   @IsOptional()
   @IsString({ message: 'Target URL must be a string if provided.' })
   @IsUrl({})
-  targetUrl?: string | null; // Можно передавать null или undefined
+  targetUrl?: string | null;
 
   @IsOptional()
   @IsBoolean({ message: 'Promoted must be a boolean value.' })
-  promoted?: boolean | null; // Можно передавать null или undefined
+  promoted?: boolean | null;
+}
 
-  @IsOptional()
-  @IsArray({ message: 'Extra tags must be an array of strings.' })
-  @IsString({ each: true, message: 'Each extra tag must be a string.' })
-  extraTags?: string | null; // Можно передавать null или undefined
+export interface PostWithMediaParserDto {
+  accountId: string;
+  content: string;
+  hashtags?: string;
+  targetUrl?: string;
+  promoted?: boolean;
+  imageSource?: string;
+  isImageProcessed?: boolean;
+  isAutoPost?: boolean;
 }

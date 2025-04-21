@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "ContentSetting" ALTER COLUMN "promptText" DROP NOT NULL,
+ALTER COLUMN "targetUrl" DROP NOT NULL,
+ALTER COLUMN "autoPost" DROP NOT NULL,
+ALTER COLUMN "cronExpression" DROP NOT NULL,
+ALTER COLUMN "promotedOnly" DROP NOT NULL;
