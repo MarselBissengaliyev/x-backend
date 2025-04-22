@@ -5,8 +5,9 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  provider      = "prisma-client-js"
+  output        = "../generated/prisma"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -49,9 +50,9 @@ model ContentSetting {
   promptHashtags String?
   imageSource    String?
   targetUrl      String?
-  autoPost       Boolean?  @default(false)
+  autoPost       Boolean? @default(false)
   cronExpression String?
-  promotedOnly   Boolean?  @default(false)
+  promotedOnly   Boolean? @default(false)
   useAiOnImage   Boolean? // Только для метода 2
 
   account Account @relation(fields: [accountId], references: [id])
