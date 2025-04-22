@@ -380,46 +380,60 @@ export class PuppeteerService {
     try {
       const selector = '[data-testid="adFormatsGroup-SINGLE_MEDIA"]';
       const singleMediaElement = await page.waitForSelector(selector, {
-        timeout: 10000,
+        timeout: 20000, // Увеличили таймаут
       });
       if (!singleMediaElement) throw new Error('Single media not found');
-
+  
       await page.evaluate((sel) => {
         const el = document.querySelector(sel);
         el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, selector);
-
+  
       await singleMediaElement.focus();
       await page.keyboard.press('Space');
-
+  
+      // Ждем кнопку "Добавить медиа"
       await page.waitForSelector('button[data-test-id="addMediaButton"]', {
-        timeout: 10000,
+        timeout: 20000, // Увеличили таймаут
       });
       await page.click('button[data-test-id="addMediaButton"]');
-
+  
+      // Скачиваем и обрабатываем изображение
       const localPath = await downloadImageToTempFile(imageUrl, 1200, 1200);
+      console.log('[handleMediaUpload] Image saved to:', localPath);
+  
+      // Находим элемент ввода для изображения
       const input = (await page.waitForSelector(
         '.FilePicker-callToActionFileInput',
-        { timeout: 10000 },
+        { timeout: 20000 }, // Увеличили таймаут
       )) as puppeteer.ElementHandle<HTMLInputElement>;
-      if (!input) throw new Error('Image input not found');
+      if (!input) {
+        console.error('[handleMediaUpload] Image input not found');
+        throw new Error('Image input not found');
+      }
       await input.uploadFile(localPath);
-
-      await page.waitForSelector('button.Button--primary', { timeout: 10000 });
+  
+      // Ждем, пока кнопка станет доступной для клика
+      await page.waitForSelector('button.Button--primary', { timeout: 20000 });
       await page.waitForFunction(() => {
         const btn = document.querySelector('button.Button--primary');
         return btn && !btn.hasAttribute('disabled');
       });
-
+  
+      // Кликаем по кнопке для загрузки
       await page.click('button.Button--primary');
+      console.log('[handleMediaUpload] Clicked primary button to submit');
+  
+      // Удаляем временный файл после использования
       await fs.promises.unlink(localPath);
-
+  
       return true;
     } catch (err) {
       this.logger.error('Image upload error:', err);
       return false;
     }
   }
+  
 
   private async publishPost(page: puppeteer.Page) {
     await page.click('button[data-test-id="tweetSaveButton"]');
