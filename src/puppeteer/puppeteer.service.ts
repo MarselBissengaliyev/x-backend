@@ -2,7 +2,7 @@ import {
   BadRequestException,
   Injectable,
   Logger,
-  NotFoundException
+  NotFoundException,
 } from '@nestjs/common';
 import * as fs from 'fs';
 import * as puppeteer from 'puppeteer-core';
@@ -272,7 +272,7 @@ export class PuppeteerService {
     await this.publishPost(page);
     await this.savePostToDb(post);
 
-    await browser.close();
+    // await browser.close();
     return { success: true };
   }
 
@@ -372,8 +372,32 @@ export class PuppeteerService {
       .filter(Boolean)
       .join('\n');
 
-    await page.focus('.TweetTextInput-editor');
-    await page.keyboard.type(fullContent); // Используй type() для эмуляции ввода
+    await page.evaluate((text) => {
+      const editor = document.querySelector('.TweetTextInput-editor');
+      if (editor && editor instanceof HTMLElement) {
+        editor.focus();
+
+        // Очистка предыдущего текста
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        editor.innerHTML = ''; // или editor.textContent = ''; если без разметки
+
+        // Вставка текста
+        const lines = text.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = document.createTextNode(lines[i]);
+          editor.appendChild(line);
+          if (i < lines.length - 1)
+            editor.appendChild(document.createElement('br'));
+        }
+
+        // Вызываем input событие, если нужно запустить какие-то listeners
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }, fullContent);
   }
 
   private async togglePromotion(page: puppeteer.Page, promoted: boolean) {
@@ -441,15 +465,22 @@ export class PuppeteerService {
       await fs.promises.unlink(localPath);
 
       // Нажимаем кнопку Save
-      await page.waitForSelector('button.Button--small', { timeout: 10000 });
-      const buttons = await page.$$('button.Button--small');
-      for (const btn of buttons) {
-        const text = await btn.evaluate((el) => el.textContent?.trim());
-        if (text === 'Save') {
-          console.log('[handleMediaUpload] Clicking Save button...');
-          await btn.click();
-          break;
+      try {
+        await page.waitForSelector('button.Button--small', { timeout: 5000 });
+
+        const buttons = await page.$$('button.Button--small');
+        for (const btn of buttons) {
+          const text = await btn.evaluate((el) => el.textContent?.trim());
+          if (text === 'Save') {
+            console.log('[handleMediaUpload] Clicking Save button...');
+            await btn.click();
+            break;
+          }
         }
+      } catch (err) {
+        console.log(
+          '[handleMediaUpload] Save button not found — skipping click',
+        );
       }
 
       return true;
