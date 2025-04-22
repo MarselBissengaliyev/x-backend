@@ -442,7 +442,7 @@ export class PuppeteerService {
       await page.click('button[data-test-id="addMediaButton"]');
 
       // Скачиваем и обрабатываем изображение
-      const localPath = await downloadImageToTempFile(imageUrl, 1200, 1200);
+      const localPath = await downloadImageToTempFile(imageUrl, 800, 800);
       console.log('[handleMediaUpload] Image saved to:', localPath);
 
       const input = (await page.waitForSelector(
