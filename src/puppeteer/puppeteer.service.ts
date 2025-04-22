@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
-import * as puppeteer from 'puppeteer-core';
+import * as puppeteer from 'puppeteer';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { LoginDto, PostDto } from './puppeteer.dto';
 import { delay, downloadImageToTempFile } from './puppeteer.utils';

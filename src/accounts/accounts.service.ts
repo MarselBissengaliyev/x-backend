@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Page } from 'puppeteer-core';
+import { Page } from 'puppeteer';
 import { PuppeteerService } from 'src/puppeteer/puppeteer.service';
 import { v4 as uuid } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
