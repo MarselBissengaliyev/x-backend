@@ -85,18 +85,28 @@ export class PuppeteerService {
       await page.waitForSelector('h1[role="heading"]', { timeout: 3000 });
 
       const challengeText = await page.evaluate(() => {
-        const xpath = "//text()[contains(., 'There was unusual login activity on your account. To help keep your account safe, please enter your')]";
-        const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        const xpath =
+          "//text()[contains(., 'There was unusual login activity on your account. To help keep your account safe, please enter your')]";
+        const result = document.evaluate(
+          xpath,
+          document,
+          null,
+          XPathResult.FIRST_ORDERED_NODE_TYPE,
+          null,
+        );
         return result.singleNodeValue?.textContent || '';
       });
-      
-      if (challengeText.includes('There was unusual login activity on your account. To help keep your account safe, please enter your')) {
+
+      if (
+        challengeText.includes(
+          'There was unusual login activity on your account. To help keep your account safe, please enter your',
+        )
+      ) {
         this.logger.warn(
           'Unusual login activity detected, waiting for user input...',
         );
         return { result: { challengeRequired: true }, page };
       }
-      
     } catch (err) {
       this.logger.log('No unusual activity challenge detected');
     }
@@ -137,7 +147,6 @@ export class PuppeteerService {
         JSON.stringify(cookies, null, 2),
       );
       this.logger.log('Cookies saved after successful login');
-      
 
       this.logger.log('Login successful without 2FA');
       return { result: { success: true }, page };
@@ -179,23 +188,23 @@ export class PuppeteerService {
       // Если 2FA требуется, запросим код и передадим его для ввода
       return { result: { twoFactorRequired: true }, page };
     } catch {
-    // Ждем, пока страница перейдет в режим успешного логина или проверим ошибки
-    // await page.waitForNavigation({ waitUntil: 'networkidle2' });
+      // Ждем, пока страница перейдет в режим успешного логина или проверим ошибки
+      // await page.waitForNavigation({ waitUntil: 'networkidle2' });
 
-    const loginError = await page.evaluate(() => {
-      const el = document.querySelector('div[role="alert"]')?.textContent;
-      return el || '';
-    });
+      const loginError = await page.evaluate(() => {
+        const el = document.querySelector('div[role="alert"]')?.textContent;
+        return el || '';
+      });
 
-    if (
-      loginError.toLowerCase().includes('wrong') ||
-      loginError.toLowerCase().includes('неправильный')
-    ) {
-      this.logger.warn('Login failed: ' + loginError);
-      return { result: { success: false, error: loginError }, page };
-    } else {
-      return { result: { success: true } }
-    }
+      if (
+        loginError.toLowerCase().includes('wrong') ||
+        loginError.toLowerCase().includes('неправильный')
+      ) {
+        this.logger.warn('Login failed: ' + loginError);
+        return { result: { success: false, error: loginError }, page };
+      } else {
+        return { result: { success: true } };
+      }
     }
   }
 
@@ -383,24 +392,24 @@ export class PuppeteerService {
         timeout: 20000,
       });
       if (!singleMediaElement) throw new Error('Single media not found');
-  
+
       await page.evaluate((sel) => {
         const el = document.querySelector(sel);
         el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, selector);
-  
+
       await singleMediaElement.focus();
       await page.keyboard.press('Space');
-  
+
       await page.waitForSelector('button[data-test-id="addMediaButton"]', {
         timeout: 20000,
       });
       await page.click('button[data-test-id="addMediaButton"]');
-  
+
       // Скачиваем и обрабатываем изображение
       const localPath = await downloadImageToTempFile(imageUrl, 1200, 1200);
       console.log('[handleMediaUpload] Image saved to:', localPath);
-  
+
       // Даем странице время на рендеринг элементов
       console.log('[handleMediaUpload] Waiting for the input element...');
       await delay(3000); // пауза 3 секунды
@@ -409,28 +418,62 @@ export class PuppeteerService {
         '.FilePicker-callToActionFileInput',
         { timeout: 20000 }, // Увеличили таймаут
       )) as puppeteer.ElementHandle<HTMLInputElement>;
-  
+
       if (!input) {
         console.error('[handleMediaUpload] Image input not found');
         throw new Error('Image input not found');
       }
-      console.log('[handleMediaUpload] Input element found, uploading image...');
+      console.log(
+        '[handleMediaUpload] Input element found, uploading image...',
+      );
       await input.uploadFile(localPath);
-  
+
       // Ждем, пока кнопка станет доступной для клика
       console.log('[handleMediaUpload] Waiting for the primary button...');
-      await page.waitForSelector('button.Button--primary', { timeout: 20000 });
-      await page.waitForFunction(() => {
-        const btn = document.querySelector('button.Button--primary');
-        return btn && !btn.hasAttribute('disabled');
-      });
-  
-      console.log('[handleMediaUpload] Clicking the primary button to submit...');
+
+      // Проверим, есть ли вообще такая кнопка
+      const btnExists = await page.$('button[data-test-id="tweetSaveButton"]');
+      console.log('[handleMediaUpload] Button exists:', !!btnExists);
+
+      if (!btnExists) {
+        const html = await page.content();
+        await fs.promises.writeFile(
+          `/tmp/debug-no-button-${Date.now()}.html`,
+          html,
+        );
+        await page.screenshot({
+          path: `/tmp/debug-no-button-${Date.now()}.png`,
+        });
+        throw new Error('Primary button not found');
+      }
+
+      // Ждём кнопку с классом и проверяем, что она активна
+      await page.waitForSelector('button.Button--primary', { timeout: 30000 });
+
+      await page.waitForFunction(
+        () => {
+          const btn = document.querySelector('button.Button--primary');
+          return (
+            btn &&
+            !btn.classList.contains('is-disabled') &&
+            !btn.hasAttribute('disabled')
+          );
+        },
+        { timeout: 30000 },
+      );
+
+      console.log(
+        '[handleMediaUpload] Primary button is active and ready to click',
+      );
+
+      console.log(
+        '[handleMediaUpload] Clicking the primary button to submit...',
+      );
       await page.click('button.Button--primary');
-  
+
       // Удаляем временный файл после использования
       await fs.promises.unlink(localPath);
-  
+
       return true;
     } catch (err) {
       console.error('[handleMediaUpload] Error during image upload:', err);
@@ -438,8 +481,6 @@ export class PuppeteerService {
       return false;
     }
   }
-  
-  
 
   private async publishPost(page: puppeteer.Page) {
     await page.click('button[data-test-id="tweetSaveButton"]');
