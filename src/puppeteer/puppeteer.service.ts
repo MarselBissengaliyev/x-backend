@@ -516,7 +516,7 @@ export class PuppeteerService {
     // Ждём небольшое время, чтобы действие завершилось
     await delay(2000); // Добавляем задержку, например 2 секунды
 
-    await page.screenshot({ path: 'fail.png' });
+    // await page.screenshot({ path: 'fail.png' });
 
     // Ждём появления уведомления с ссылкой на твит
     const tweetSelector = '.Notification-body a[href*="/status/"]';
