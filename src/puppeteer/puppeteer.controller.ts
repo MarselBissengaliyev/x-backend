@@ -16,7 +16,7 @@ export class PuppeteerController {
 
     if (result.success) {
       this.logger.log('Post successfully submitted');
-      return { message: 'Post successfully submitted' };
+      return { message: 'Post successfully submitted', url: result.url };
     } else {
       this.logger.error('Post submission failed');
       throw new Error('Post submission failed');

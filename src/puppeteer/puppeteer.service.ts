@@ -1,8 +1,7 @@
 import {
   BadRequestException,
   Injectable,
-  Logger,
-  NotFoundException,
+  Logger
 } from '@nestjs/common';
 import * as fs from 'fs';
 import * as puppeteer from 'puppeteer-core';
@@ -257,7 +256,6 @@ export class PuppeteerService {
     await this.navigateToComposer(page);
 
     await this.closeWelcomeModalIfExists(page);
-    await this.insertPostContent(page, post);
 
     await this.togglePromotion(page, post.promoted || false);
 
@@ -269,11 +267,15 @@ export class PuppeteerService {
       }
     }
 
-    await this.publishPost(page);
+    await this.insertPostContent(page, post);
+    const url = await this.publishPost(page);
+    if (!url) {
+      return { success: false, message: 'Url not found' };
+    }
     await this.savePostToDb(post);
 
     // await browser.close();
-    return { success: true };
+    return { success: true, url };
   }
 
   private async getAccountOrThrow(accountId: string) {
@@ -494,12 +496,12 @@ export class PuppeteerService {
     }
   }
 
-  private async publishPost(page: puppeteer.Page) {
+  private async publishPost(page: puppeteer.Page): Promise<string> {
     await page.waitForSelector('button[data-test-id="tweetSaveButton"]', {
       timeout: 10000,
     });
-  
-    // Форсим активацию
+
+    // Активируем кнопку отправки
     await page.evaluate(() => {
       const button = document.querySelector(
         'button[data-test-id="tweetSaveButton"]',
@@ -509,14 +511,24 @@ export class PuppeteerService {
         button.classList.remove('is-disabled');
       }
     });
-  
-    // Проверяем и кликаем
+
+    // Кликаем по кнопке
     const button = await page.$('button[data-test-id="tweetSaveButton"]');
     if (!button) throw new Error('Button not found (even after force)');
     await button.click();
-    await delay(3000);
+
+    // Ждём появления уведомления с ссылкой на твит
+    const tweetSelector = '.Notification-body a[href*="/status/"]';
+    await page.waitForSelector(tweetSelector, { timeout: 50000 });
+
+    // Извлекаем ссылку
+    const tweetUrl = await page.$eval(tweetSelector, (a: Element) => {
+      return (a as HTMLAnchorElement).href;
+    });
+
+    return tweetUrl;
   }
-  
+
   private async savePostToDb(post: PostDto) {
     await this.prisma.post.create({
       data: {
