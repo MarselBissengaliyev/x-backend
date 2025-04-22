@@ -519,7 +519,7 @@ export class PuppeteerService {
 
     // Ждём появления уведомления с ссылкой на твит
     const tweetSelector = '.Notification-body a[href*="/status/"]';
-    await page.waitForSelector(tweetSelector, { timeout: 50000 });
+    await page.waitForSelector(tweetSelector, { timeout: 500000 });
 
     // Извлекаем ссылку
     const tweetUrl = await page.$eval(tweetSelector, (a: Element) => {
