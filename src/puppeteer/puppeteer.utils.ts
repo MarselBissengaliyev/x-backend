@@ -68,7 +68,7 @@ export async function downloadImageToTempFile(
   } catch (error) {
     console.error(
       '[downloadImageToTempFile] Error downloading or resizing image:',
-      error,
+      error.message,
     );
     throw error;
   }

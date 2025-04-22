@@ -242,8 +242,6 @@ export class PuppeteerService {
   }
 
   async submitPost(post: PostDto, userAgent: string) {
-    this.logger.log(`Starting to submit post: ${JSON.stringify(post)}`);
-
     const account = await this.getAccountOrThrow(post.accountId);
 
     const browser = await this.launchBrowser(account.proxy);
@@ -419,7 +417,7 @@ export class PuppeteerService {
       const singleMediaElement = await page.waitForSelector(selector, {
         timeout: 20000,
       });
-      if (!singleMediaElement) throw new Error('Single media not found');
+      if (!singleMediaElement) return false;
 
       await page.evaluate((sel) => {
         const el = document.querySelector(sel);
@@ -438,9 +436,6 @@ export class PuppeteerService {
       const localPath = await downloadImageToTempFile(imageUrl, 1200, 1200);
       console.log('[handleMediaUpload] Image saved to:', localPath);
 
-      // Даем странице время на рендеринг элементов
-      console.log('[handleMediaUpload] Waiting for the input element...');
-      await delay(3000); // пауза 3 секунды
 
       const input = (await page.waitForSelector(
         '.FilePicker-callToActionFileInput',
@@ -449,7 +444,7 @@ export class PuppeteerService {
 
       if (!input) {
         console.error('[handleMediaUpload] Image input not found');
-        throw new Error('Image input not found');
+        return false;
       }
       console.log(
         '[handleMediaUpload] Input element found, uploading image...',
@@ -461,16 +456,24 @@ export class PuppeteerService {
 
       return true;
     } catch (err) {
-      console.error('[handleMediaUpload] Error during image upload:', err);
-      this.logger.error('Image upload error:', err);
+      console.error('[handleMediaUpload] Error during image upload:', err.message);
+      this.logger.error('Image upload error:', err.message);
       return false;
     }
   }
 
   private async publishPost(page: puppeteer.Page) {
+    // Ждём, пока кнопка станет активной
+    await page.waitForFunction(() => {
+      const button = document.querySelector('button[data-test-id="tweetSaveButton"]');
+      return button && !button.hasAttribute('disabled') && !button.classList.contains('is-disabled');
+    });
+  
+    // Кликаем по активной кнопке
     await page.click('button[data-test-id="tweetSaveButton"]');
     await delay(3000);
   }
+  
 
   private async savePostToDb(post: PostDto) {
     await this.prisma.post.create({
