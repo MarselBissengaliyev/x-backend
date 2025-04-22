@@ -258,13 +258,13 @@ export class PuppeteerService {
 
     await this.togglePromotion(page, post.promoted || false);
 
-    // if (post.imageUrl) {
-    //   const success = await this.handleMediaUpload(page, post.imageUrl);
-    //   if (!success) {
-    //     await browser.close();
-    //     return { success: false, message: 'Media upload failed' };
-    //   }
-    // }
+    if (post.imageUrl) {
+      const success = await this.handleMediaUpload(page, post.imageUrl);
+      if (!success) {
+        await browser.close();
+        return { success: false, message: 'Media upload failed' };
+      }
+    }
 
     await this.publishPost(page);
     await this.savePostToDb(post);
@@ -455,49 +455,6 @@ export class PuppeteerService {
         '[handleMediaUpload] Input element found, uploading image...',
       );
       await input.uploadFile(localPath);
-
-      // Ждем, пока кнопка станет доступной для клика
-      console.log('[handleMediaUpload] Waiting for the primary button...');
-
-      // Проверим, есть ли вообще такая кнопка
-      const btnExists = await page.$('button[data-test-id="tweetSaveButton"]');
-      console.log('[handleMediaUpload] Button exists:', !!btnExists);
-
-      if (!btnExists) {
-        const html = await page.content();
-        await fs.promises.writeFile(
-          `/tmp/debug-no-button-${Date.now()}.html`,
-          html,
-        );
-        await page.screenshot({
-          path: `/tmp/debug-no-button-${Date.now()}.png`,
-        });
-        throw new Error('Primary button not found');
-      }
-
-      // Ждём кнопку с классом и проверяем, что она активна
-      await page.waitForSelector('button.Button--primary', { timeout: 30000 });
-
-      await page.waitForFunction(
-        () => {
-          const btn = document.querySelector('button.Button--primary');
-          return (
-            btn &&
-            !btn.classList.contains('is-disabled') &&
-            !btn.hasAttribute('disabled')
-          );
-        },
-        { timeout: 30000 },
-      );
-
-      console.log(
-        '[handleMediaUpload] Primary button is active and ready to click',
-      );
-
-      console.log(
-        '[handleMediaUpload] Clicking the primary button to submit...',
-      );
-      await page.click('button.Button--primary');
 
       // Удаляем временный файл после использования
       await fs.promises.unlink(localPath);
