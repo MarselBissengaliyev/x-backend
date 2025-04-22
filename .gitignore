@@ -15,6 +15,9 @@ lerna-debug.log*
 cookies/*
 cookies/
 
+generated/
+
+
 # OS
 .DS_Store
 
