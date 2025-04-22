@@ -57,7 +57,7 @@ export class PuppeteerService {
     const browser = await puppeteer.launch({
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
-      headless: isProd, // true на проде, false — локально
+      headless: "new" as any, // true на проде, false — локально
       args,
     });
 
@@ -321,7 +321,7 @@ export class PuppeteerService {
     return puppeteer.launch({
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
-      headless: isProd, // true на проде, false — локально
+      headless: "new" as any, // true на проде, false — локально
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
   }
@@ -519,7 +519,7 @@ export class PuppeteerService {
 
     // Ждём появления уведомления с ссылкой на твит
     const tweetSelector = '.Notification-body a[href*="/status/"]';
-    await page.waitForSelector(tweetSelector, { timeout: 500000 });
+    await page.waitForSelector(tweetSelector, { timeout: 50000 });
 
     // Извлекаем ссылку
     const tweetUrl = await page.$eval(tweetSelector, (a: Element) => {
