@@ -454,7 +454,12 @@ export class PuppeteerService {
   }
 
   private async publishPost(page: puppeteer.Page) {
-    await page.waitForSelector('button[data-test-id="tweetSaveButton"]:not([disabled])', { timeout: 5000 });
+    await page.waitForFunction(() => {
+      const button = document.querySelector('button[data-test-id="tweetSaveButton"]') as HTMLButtonElement;
+      return button && !button.disabled && !button.classList.contains('is-disabled');
+    }, { timeout: 10000 });
+    
+    await page.waitForSelector('button[data-test-id="tweetSaveButton"]:not([disabled])', { timeout: 10000 });
   
     const button = await page.$('button[data-test-id="tweetSaveButton"]');
     if (!button) throw new NotFoundException("Button not fond");

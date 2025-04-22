@@ -177,6 +177,10 @@ const config = {
         "fromEnvVar": null,
         "value": "windows",
         "native": true
+      },
+      {
+        "fromEnvVar": null,
+        "value": "debian-openssl-3.0.x"
       }
     ],
     "previewFeatures": [],
@@ -194,16 +198,17 @@ const config = {
     "db"
   ],
   "activeProvider": "postgresql",
+  "postinstall": false,
   "inlineDatasources": {
     "db": {
       "url": {
         "fromEnvVar": "DATABASE_URL",
-        "value": "postgresql://myuser:mypassword@localhost:5432/mydatabase"
+        "value": null
       }
     }
   },
-  "inlineSchema": "// This is your Prisma schema file,\n// learn more about it in the docs: https://pris.ly/d/prisma-schema\n\n// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?\n// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init\n\ngenerator client {\n  provider = \"prisma-client-js\"\n  output   = \"../generated/prisma\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n  url      = env(\"DATABASE_URL\")\n}\n\nmodel Account {\n  id              String          @id @default(uuid())\n  login           String          @unique\n  password        String\n  proxy           String? // Сделано необязательным\n  method          Int // 1 или 2\n  userAgent       String\n  posts           Post[]\n  contentSettings ContentSetting?\n  createdAt       DateTime        @default(now())\n  ScheduledPost   ScheduledPost[]\n}\n\nmodel Post {\n  id        String   @id @default(uuid())\n  accountId String\n  content   String\n  imageUrl  String?\n  hashtags  String?\n  targetUrl String?\n  promoted  Boolean  @default(false)\n  createdAt DateTime @default(now())\n\n  account       Account         @relation(fields: [accountId], references: [id])\n  ScheduledPost ScheduledPost[]\n}\n\nmodel ContentSetting {\n  id             String   @id @default(uuid())\n  accountId      String   @unique\n  promptText     String?\n  promptImage    String?\n  promptHashtags String?\n  imageSource    String?\n  targetUrl      String?\n  autoPost       Boolean? @default(false)\n  cronExpression String?\n  promotedOnly   Boolean? @default(false)\n  useAiOnImage   Boolean? // Только для метода 2\n\n  account Account @relation(fields: [accountId], references: [id])\n}\n\nmodel ScheduledPost {\n  id          String   @id @default(uuid())\n  accountId   String\n  scheduledAt DateTime\n  status      String // pending, done, failed\n  createdAt   DateTime @default(now())\n  postId      String?\n\n  account Account @relation(fields: [accountId], references: [id])\n  post    Post?   @relation(fields: [postId], references: [id]) // 👈 Добавляем это\n}\n",
-  "inlineSchemaHash": "d45578da62ed22faf2fb57c168e801dc4fba5cb8c4bc059e41f7caaa753cd4d7",
+  "inlineSchema": "// This is your Prisma schema file,\n// learn more about it in the docs: https://pris.ly/d/prisma-schema\n\n// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?\n// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init\n\ngenerator client {\n  provider      = \"prisma-client-js\"\n  output        = \"../generated/prisma\"\n  binaryTargets = [\"native\", \"debian-openssl-3.0.x\"]\n}\n\ndatasource db {\n  provider = \"postgresql\"\n  url      = env(\"DATABASE_URL\")\n}\n\nmodel Account {\n  id              String          @id @default(uuid())\n  login           String          @unique\n  password        String\n  proxy           String? // Сделано необязательным\n  method          Int // 1 или 2\n  userAgent       String\n  posts           Post[]\n  contentSettings ContentSetting?\n  createdAt       DateTime        @default(now())\n  ScheduledPost   ScheduledPost[]\n}\n\nmodel Post {\n  id        String   @id @default(uuid())\n  accountId String\n  content   String\n  imageUrl  String?\n  hashtags  String?\n  targetUrl String?\n  promoted  Boolean  @default(false)\n  createdAt DateTime @default(now())\n\n  account       Account         @relation(fields: [accountId], references: [id])\n  ScheduledPost ScheduledPost[]\n}\n\nmodel ContentSetting {\n  id             String   @id @default(uuid())\n  accountId      String   @unique\n  promptText     String?\n  promptImage    String?\n  promptHashtags String?\n  imageSource    String?\n  targetUrl      String?\n  autoPost       Boolean? @default(false)\n  cronExpression String?\n  promotedOnly   Boolean? @default(false)\n  useAiOnImage   Boolean? // Только для метода 2\n\n  account Account @relation(fields: [accountId], references: [id])\n}\n\nmodel ScheduledPost {\n  id          String   @id @default(uuid())\n  accountId   String\n  scheduledAt DateTime\n  status      String // pending, done, failed\n  createdAt   DateTime @default(now())\n  postId      String?\n\n  account Account @relation(fields: [accountId], references: [id])\n  post    Post?   @relation(fields: [postId], references: [id]) // 👈 Добавляем это\n}\n",
+  "inlineSchemaHash": "0c89be249f73d7c24e74b4f852e274197b60fdcfe18b0eb0fce16542ef5340e5",
   "copyEngine": true
 }
 config.dirname = '/'
