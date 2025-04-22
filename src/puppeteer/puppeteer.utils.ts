@@ -14,7 +14,7 @@ export async function downloadImageToTempFile(
 ): Promise<string> {
   console.log('[downloadImageToTempFile] Start downloading image:', url);
 
-  if (!url || typeof url !== 'string') {
+  if (!url || typeof url !== 'string' || url.trim() === '') {
     console.error('[downloadImageToTempFile] Invalid image URL:', url);
     throw new Error('Invalid image URL');
   }
@@ -42,26 +42,27 @@ export async function downloadImageToTempFile(
     console.log(`[downloadImageToTempFile] Image saved to: ${filePath}`);
 
     // Получение размеров изображения перед изменением
-    const image = await sharp(filePath);
+    const image = sharp(filePath);
     const metadata = await image.metadata();
 
-    // Проверка, что metadata существует и содержит размер
-    if (metadata.size && metadata.size > 3 * 1024 * 1024) {
-      console.error('[downloadImageToTempFile] Image size exceeds 3MB, resizing...');
-      await image.resize(targetWidth, targetHeight).toFile(filePath); // Масштабируем, если нужно
+    // Проверка размера изображения
+    if (!metadata.size || metadata.size <= 0 || metadata.size > 3 * 1024 * 1024) {
+      console.error('[downloadImageToTempFile] Image size is either invalid or exceeds 3MB, resizing...');
+      await image.resize(targetWidth, targetHeight).toFile(filePath);
     }
 
     // Проверка на соотношение сторон 1:1
-    if (typeof metadata.width === 'number' && typeof metadata.height === 'number') {
-      if (metadata.width !== metadata.height) {
+    if (metadata.width && metadata.height) {
+      const minDimension = Math.min(metadata.width, metadata.height);
+      if (minDimension > 0 && metadata.width !== metadata.height) {
         console.log('[downloadImageToTempFile] Cropping image to 1:1 aspect ratio');
         await image
-          .resize(Math.min(metadata.width, metadata.height), Math.min(metadata.width, metadata.height))
+          .resize(minDimension, minDimension)
           .extract({
-            left: Math.abs(metadata.width - metadata.height) / 2,
-            top: Math.abs(metadata.width - metadata.height) / 2,
-            width: Math.min(metadata.width, metadata.height),
-            height: Math.min(metadata.width, metadata.height),
+            left: (metadata.width - minDimension) / 2,
+            top: (metadata.height - minDimension) / 2,
+            width: minDimension,
+            height: minDimension,
           })
           .toFile(filePath);
       }
@@ -92,6 +93,3 @@ export async function downloadImageToTempFile(
     throw error;
   }
 }
-
-
-
