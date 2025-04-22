@@ -189,4 +189,20 @@ export class AccountsService {
       },
     });
   }
+
+  async deleteAccount(accountId: string) {
+    this.logger.log(`Attempting to delete account with ID: ${accountId}`);
+    try {
+      // Удаляем аккаунт, все связанные посты, контентные настройки и запланированные посты будут удалены благодаря каскадному удалению
+      await this.prisma.account.delete({
+        where: { id: accountId },
+      });
+
+      this.logger.log(`Account with ID ${accountId} deleted successfully`);
+      return { success: true, message: `Account with ID ${accountId} deleted successfully` };
+    } catch (err) {
+      this.logger.error(`Error deleting account with ID: ${accountId}`, err.stack);
+      throw new Error('Ошибка при удалении аккаунта');
+    }
+  }
 }

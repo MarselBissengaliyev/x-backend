@@ -22,10 +22,10 @@ model Account {
   proxy           String? // Сделано необязательным
   method          Int // 1 или 2
   userAgent       String
-  posts           Post[]
-  contentSettings ContentSetting?
+  posts           Post[] // Без @relation(onDelete: Cascade)
+  contentSettings ContentSetting? // Без onDelete: Cascade
   createdAt       DateTime        @default(now())
-  ScheduledPost   ScheduledPost[]
+  ScheduledPost   ScheduledPost[] // Без onDelete: Cascade
 }
 
 model Post {
@@ -38,8 +38,8 @@ model Post {
   promoted  Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  account       Account         @relation(fields: [accountId], references: [id])
-  ScheduledPost ScheduledPost[]
+  account       Account         @relation(fields: [accountId], references: [id], onDelete: Cascade) // Устанавливаем каскадное удаление
+  ScheduledPost ScheduledPost[] // Без onDelete: Cascade
 }
 
 model ContentSetting {
@@ -55,7 +55,7 @@ model ContentSetting {
   promotedOnly   Boolean? @default(false)
   useAiOnImage   Boolean? // Только для метода 2
 
-  account Account @relation(fields: [accountId], references: [id])
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade) // Устанавливаем каскадное удаление
 }
 
 model ScheduledPost {
@@ -66,6 +66,6 @@ model ScheduledPost {
   createdAt   DateTime @default(now())
   postId      String?
 
-  account Account @relation(fields: [accountId], references: [id])
-  post    Post?   @relation(fields: [postId], references: [id]) // 👈 Добавляем это
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade) // Устанавливаем каскадное удаление
+  post    Post?   @relation(fields: [postId], references: [id], onDelete: Cascade) // Устанавливаем каскадное удаление
 }

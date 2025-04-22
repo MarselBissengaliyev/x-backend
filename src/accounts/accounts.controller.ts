@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { CreateAccountDto } from './accounts.dto';
 import { AccountsService } from './accounts.service';
@@ -15,10 +15,19 @@ export class AccountsController {
 
   @Post('submit-challenge')
   async submitChallenge(
-    @Body() body: { sessionId: string; challengeInput: string, password: string },
+    @Body()
+    body: {
+      sessionId: string;
+      challengeInput: string;
+      password: string;
+    },
   ) {
     const { sessionId, challengeInput, password } = body;
-    return this.accountService.submitChallenge(sessionId, challengeInput, password);
+    return this.accountService.submitChallenge(
+      sessionId,
+      challengeInput,
+      password,
+    );
   }
 
   @Post('submit-code')
@@ -37,5 +46,10 @@ export class AccountsController {
   @Get(':id')
   async findById(@Param('id') id: string) {
     return this.accountService.findById(id);
+  }
+
+  @Delete(':id')
+  async deleteAccount(@Param('id') id: string) {
+    return await this.accountService.deleteAccount(id);
   }
 }
