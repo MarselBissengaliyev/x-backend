@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import * as fs from 'fs';
 import * as puppeteer from 'puppeteer-core';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -468,27 +473,34 @@ export class PuppeteerService {
     try {
       console.log('Ожидание активации кнопки Post...');
 
+      const buttonSelector = 'button[data-test-id="tweetSaveButton"]';
+
       await page.waitForFunction(
-        () => {
-          const button = document.querySelector(
-            'button[data-test-id="tweetSaveButton"]',
-          );
+        (selector) => {
+          const button = document.querySelector(selector);
           return (
             button &&
             !button.hasAttribute('disabled') &&
             !button.classList.contains('is-disabled')
           );
         },
-        { timeout: 30000 }, // увеличил для стабильности
+        { timeout: 30000 },
+        buttonSelector,
       );
 
-      console.log('Кнопка активна. Публикуем пост...');
-      await page.click('button[data-test-id="tweetSaveButton"]');
+      console.log('Кнопка активна. Отправляем Space...');
+
+      const button = await page.$(buttonSelector);
+      if (!button) throw new Error('Кнопка не найдена');
+
+      await button.focus();
+      await page.keyboard.press('Space'); // Нажатие пробела
       await delay(3000);
-      console.log('Пост опубликован.');
-      console.log('Пост опубликован.');
+
+      console.log('Пост отправлен.');
     } catch (error) {
       console.error('Ошибка при публикации поста:', error.message);
+      throw new InternalServerErrorException('Ошибка при публикации поста');
     }
   }
 
