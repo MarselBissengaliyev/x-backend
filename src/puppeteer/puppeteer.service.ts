@@ -273,7 +273,7 @@ export class PuppeteerService {
     await this.publishPost(page);
     await this.savePostToDb(post);
 
-    await browser.close();
+    // await browser.close();
     return { success: true };
   }
 
