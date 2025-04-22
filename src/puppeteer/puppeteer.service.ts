@@ -313,8 +313,8 @@ export class PuppeteerService {
 
     return puppeteer.launch({
       executablePath:
-      process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
-    headless: isProd, // true на проде, false — локально
+        process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
+      headless: isProd, // true на проде, false — локально
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
   }
@@ -436,7 +436,6 @@ export class PuppeteerService {
       const localPath = await downloadImageToTempFile(imageUrl, 1200, 1200);
       console.log('[handleMediaUpload] Image saved to:', localPath);
 
-
       const input = (await page.waitForSelector(
         '.FilePicker-callToActionFileInput',
         { timeout: 20000 }, // Увеличили таймаут
@@ -456,24 +455,42 @@ export class PuppeteerService {
 
       return true;
     } catch (err) {
-      console.error('[handleMediaUpload] Error during image upload:', err.message);
+      console.error(
+        '[handleMediaUpload] Error during image upload:',
+        err.message,
+      );
       this.logger.error('Image upload error:', err.message);
       return false;
     }
   }
 
   private async publishPost(page: puppeteer.Page) {
-    // Ждём, пока кнопка станет активной
-    await page.waitForFunction(() => {
-      const button = document.querySelector('button[data-test-id="tweetSaveButton"]');
-      return button && !button.hasAttribute('disabled') && !button.classList.contains('is-disabled');
-    });
-  
-    // Кликаем по активной кнопке
-    await page.click('button[data-test-id="tweetSaveButton"]');
-    await delay(3000);
+    try {
+      console.log('Ожидание активации кнопки Post...');
+
+      await page.waitForFunction(
+        () => {
+          const button = document.querySelector(
+            'button[data-test-id="tweetSaveButton"]',
+          );
+          return (
+            button &&
+            !button.hasAttribute('disabled') &&
+            !button.classList.contains('is-disabled')
+          );
+        },
+        { timeout: 30000 }, // увеличил для стабильности
+      );
+
+      console.log('Кнопка активна. Публикуем пост...');
+      await page.click('button[data-test-id="tweetSaveButton"]');
+      await delay(3000);
+      console.log('Пост опубликован.');
+      console.log('Пост опубликован.');
+    } catch (error) {
+      console.error('Ошибка при публикации поста:', error.message);
+    }
   }
-  
 
   private async savePostToDb(post: PostDto) {
     await this.prisma.post.create({
