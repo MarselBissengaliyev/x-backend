@@ -495,36 +495,28 @@ export class PuppeteerService {
   }
 
   private async publishPost(page: puppeteer.Page) {
-    await page.waitForFunction(
-      () => {
-        const button = document.querySelector(
-          'button[data-test-id="tweetSaveButton"]',
-        ) as HTMLButtonElement;
-        return (
-          button &&
-          !button.disabled &&
-          !button.classList.contains('is-disabled')
-        );
-      },
-      { timeout: 20000 },
-    );
-
-    // await page.waitForSelector('button[data-test-id="tweetSaveButton"]:not([disabled])', { timeout: 10000 });
-
+    await page.waitForSelector('button[data-test-id="tweetSaveButton"]', {
+      timeout: 10000,
+    });
+  
+    // Форсим активацию
+    await page.evaluate(() => {
+      const button = document.querySelector(
+        'button[data-test-id="tweetSaveButton"]',
+      ) as HTMLButtonElement;
+      if (button) {
+        button.disabled = false;
+        button.classList.remove('is-disabled');
+      }
+    });
+  
+    // Проверяем и кликаем
     const button = await page.$('button[data-test-id="tweetSaveButton"]');
-    if (!button) throw new NotFoundException('Button not fond');
-    const isButtonDisabled = await button.evaluate(
-      (btn: HTMLButtonElement) => btn.disabled,
-    );
-
-    if (isButtonDisabled) {
-      throw new Error('Button is still disabled, cannot publish');
-    }
-
+    if (!button) throw new Error('Button not found (even after force)');
     await button.click();
-    await delay(3000); // Ждем завершения действия
+    await delay(3000);
   }
-
+  
   private async savePostToDb(post: PostDto) {
     await this.prisma.post.create({
       data: {
