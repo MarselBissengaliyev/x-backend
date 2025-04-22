@@ -48,12 +48,12 @@ export class PuppeteerService {
       }
     }
 
-    const isProd = process.env.NODE_ENV === 'production';
+    const isProd = process.env.NODE_ENV === 'development' ? false : 'new' as any;
 
     const browser = await puppeteer.launch({
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
-      headless: 'new' as any, // true на проде, false — локально
+      headless: isProd, // true на проде, false — локально
       args,
     });
 
@@ -312,12 +312,12 @@ export class PuppeteerService {
         this.logger.log('Proxy authentication credentials set');
       }
     }
-    const isProd = process.env.NODE_ENV === 'production';
+    const isProd = process.env.NODE_ENV === 'development' ? false : 'new' as any;
 
     return puppeteer.launch({
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
-      headless: 'new' as any, // true на проде, false — локально
+      headless: isProd, // true на проде, false — локально
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
   }
