@@ -85,16 +85,18 @@ export class PuppeteerService {
       await page.waitForSelector('h1[role="heading"]', { timeout: 3000 });
 
       const challengeText = await page.evaluate(() => {
-        const el = document.querySelector('h1[role="heading"]')?.textContent;
-        return el || '';
+        const xpath = "//text()[contains(., 'There was unusual login activity on your account. To help keep your account safe, please enter your')]";
+        const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        return result.singleNodeValue?.textContent || '';
       });
-
-      if (challengeText.includes('Enter your')) {
+      
+      if (challengeText.includes('There was unusual login activity on your account. To help keep your account safe, please enter your')) {
         this.logger.warn(
           'Unusual login activity detected, waiting for user input...',
         );
         return { result: { challengeRequired: true }, page };
       }
+      
     } catch (err) {
       this.logger.log('No unusual activity challenge detected');
     }
@@ -167,7 +169,7 @@ export class PuppeteerService {
       return { result: { twoFactorRequired: true }, page };
     } catch {
     // Ждем, пока страница перейдет в режим успешного логина или проверим ошибки
-    await page.waitForNavigation({ waitUntil: 'networkidle2' });
+    // await page.waitForNavigation({ waitUntil: 'networkidle2' });
 
     const loginError = await page.evaluate(() => {
       const el = document.querySelector('div[role="alert"]')?.textContent;

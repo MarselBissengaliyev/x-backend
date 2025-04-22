@@ -77,12 +77,12 @@ export class AccountsService {
 
     await this.puppeteerService.submitCode({ code, page, login });
 
-    const account = await this.prisma.account.findUnique({
+    let account = await this.prisma.account.findUnique({
       where: { login },
     });
 
     if (!account) {
-      await this.prisma.account.create({
+      account = await this.prisma.account.create({
         data: {
           id: uuid(),
           ...data,
@@ -95,7 +95,7 @@ export class AccountsService {
       `2FA successful and account created for session ID: ${sessionId}`,
     );
 
-    return { success: true };
+    return { success: true, id: account.id };
   }
 
   async submitChallenge(
@@ -130,14 +130,14 @@ export class AccountsService {
       return { twoFactorRequired: true, sessionId };
     }
 
-    const account = await this.prisma.account.findUnique({
+    let account = await this.prisma.account.findUnique({
       where: {
         login: data.login,
       },
     });
 
     if (!account) {
-      await this.prisma.account.create({
+      account = await this.prisma.account.create({
         data: {
           id: uuid(),
           ...data,
@@ -151,7 +151,7 @@ export class AccountsService {
       `Challenge input submitted and session cleared for session ID: ${sessionId}`,
     );
 
-    return { success: true };
+    return { success: true, id: account.id };
   }
 
   async findAll() {
