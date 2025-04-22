@@ -246,7 +246,7 @@ export class PuppeteerService {
 
     const account = await this.getAccountOrThrow(post.accountId);
 
-    const browser = await this.launchBrowser();
+    const browser = await this.launchBrowser(account.proxy);
     const page = await browser.newPage();
     await page.setUserAgent(userAgent);
 
@@ -285,10 +285,38 @@ export class PuppeteerService {
     return account;
   }
 
-  private async launchBrowser() {
+  private async launchBrowser(proxy: string | null) {
+    const args = ['--no-sandbox', '--disable-setuid-sandbox', '--incognito'];
+    let proxyAuth: { username: string; password: string } | null = null;
+
+    if (proxy) {
+      const proxyParts = proxy.split(':');
+
+      if (proxyParts.length < 2) {
+        throw new BadRequestException(
+          'Невалидный формат прокси. Ожидается IP:PORT или IP:PORT:LOGIN:PASSWORD',
+        );
+      }
+
+      const [ip, port, username, pwd] = proxyParts;
+      const proxyUrl = `http://${ip}:${port}`;
+      args.unshift(`--proxy-server=${proxyUrl}`);
+      this.logger.log(`Using proxy: ${proxyUrl}`);
+
+      if (username && pwd) {
+        proxyAuth = {
+          username,
+          password: pwd,
+        };
+        this.logger.log('Proxy authentication credentials set');
+      }
+    }
+    const isProd = process.env.NODE_ENV === 'production';
+    
     return puppeteer.launch({
-      executablePath: process.env.CHROMIUM_EXEC_PATH,
-      headless: false,
+      executablePath:
+      process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
+    headless: isProd, // true на проде, false — локально
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
   }
