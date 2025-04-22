@@ -1,9 +1,8 @@
 import {
   BadRequestException,
   Injectable,
-  InternalServerErrorException,
   Logger,
-  NotFoundException,
+  NotFoundException
 } from '@nestjs/common';
 import * as fs from 'fs';
 import * as puppeteer from 'puppeteer-core';
@@ -273,7 +272,7 @@ export class PuppeteerService {
     await this.publishPost(page);
     await this.savePostToDb(post);
 
-    // await browser.close();
+    await browser.close();
     return { success: true };
   }
 
@@ -364,7 +363,7 @@ export class PuppeteerService {
 
   private async insertPostContent(page: puppeteer.Page, post: PostDto) {
     await page.waitForSelector('.TweetTextInput-editor', { timeout: 10000 });
-  
+
     const fullContent = [
       post.content.trim(),
       post.hashtags?.trim(),
@@ -372,11 +371,10 @@ export class PuppeteerService {
     ]
       .filter(Boolean)
       .join('\n');
-  
+
     await page.focus('.TweetTextInput-editor');
-    await page.keyboard.type(fullContent);  // Используй type() для эмуляции ввода
+    await page.keyboard.type(fullContent); // Используй type() для эмуляции ввода
   }
-  
 
   private async togglePromotion(page: puppeteer.Page, promoted: boolean) {
     const checkbox = await page.$(
@@ -442,6 +440,18 @@ export class PuppeteerService {
       // Удаляем временный файл после использования
       await fs.promises.unlink(localPath);
 
+      // Нажимаем кнопку Save
+      await page.waitForSelector('button.Button--small', { timeout: 10000 });
+      const buttons = await page.$$('button.Button--small');
+      for (const btn of buttons) {
+        const text = await btn.evaluate((el) => el.textContent?.trim());
+        if (text === 'Save') {
+          console.log('[handleMediaUpload] Clicking Save button...');
+          await btn.click();
+          break;
+        }
+      }
+
       return true;
     } catch (err) {
       console.error(
@@ -454,25 +464,35 @@ export class PuppeteerService {
   }
 
   private async publishPost(page: puppeteer.Page) {
-    await page.waitForFunction(() => {
-      const button = document.querySelector('button[data-test-id="tweetSaveButton"]') as HTMLButtonElement;
-      return button && !button.disabled && !button.classList.contains('is-disabled');
-    }, { timeout: 20000 });
-    
+    await page.waitForFunction(
+      () => {
+        const button = document.querySelector(
+          'button[data-test-id="tweetSaveButton"]',
+        ) as HTMLButtonElement;
+        return (
+          button &&
+          !button.disabled &&
+          !button.classList.contains('is-disabled')
+        );
+      },
+      { timeout: 20000 },
+    );
+
     // await page.waitForSelector('button[data-test-id="tweetSaveButton"]:not([disabled])', { timeout: 10000 });
-  
+
     const button = await page.$('button[data-test-id="tweetSaveButton"]');
-    if (!button) throw new NotFoundException("Button not fond");
-    const isButtonDisabled = await button.evaluate((btn: HTMLButtonElement) => btn.disabled);
-  
+    if (!button) throw new NotFoundException('Button not fond');
+    const isButtonDisabled = await button.evaluate(
+      (btn: HTMLButtonElement) => btn.disabled,
+    );
+
     if (isButtonDisabled) {
       throw new Error('Button is still disabled, cannot publish');
     }
-  
+
     await button.click();
     await delay(3000); // Ждем завершения действия
   }
-  
 
   private async savePostToDb(post: PostDto) {
     await this.prisma.post.create({
