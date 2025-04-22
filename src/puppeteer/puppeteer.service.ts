@@ -3,6 +3,7 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import * as fs from 'fs';
 import * as puppeteer from 'puppeteer-core';
@@ -363,7 +364,7 @@ export class PuppeteerService {
 
   private async insertPostContent(page: puppeteer.Page, post: PostDto) {
     await page.waitForSelector('.TweetTextInput-editor', { timeout: 10000 });
-
+  
     const fullContent = [
       post.content.trim(),
       post.hashtags?.trim(),
@@ -371,28 +372,11 @@ export class PuppeteerService {
     ]
       .filter(Boolean)
       .join('\n');
-
-    await page.evaluate((content: string) => {
-      const el = document.querySelector(
-        '.TweetTextInput-editor',
-      ) as HTMLElement;
-      if (!el) return;
-
-      el.focus();
-      const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-      document.execCommand('delete');
-
-      const lines = content.split('\n');
-      for (const line of lines) {
-        document.execCommand('insertText', false, line);
-        document.execCommand('insertParagraph');
-      }
-    }, fullContent);
+  
+    await page.focus('.TweetTextInput-editor');
+    await page.keyboard.type(fullContent);  // Используй type() для эмуляции ввода
   }
+  
 
   private async togglePromotion(page: puppeteer.Page, promoted: boolean) {
     const checkbox = await page.$(
@@ -470,39 +454,20 @@ export class PuppeteerService {
   }
 
   private async publishPost(page: puppeteer.Page) {
-    try {
-      console.log('Ожидание активации кнопки Post...');
-
-      const buttonSelector = 'button[data-test-id="tweetSaveButton"]';
-
-      await page.waitForFunction(
-        (selector) => {
-          const button = document.querySelector(selector);
-          return (
-            button &&
-            !button.hasAttribute('disabled') &&
-            !button.classList.contains('is-disabled')
-          );
-        },
-        { timeout: 30000 },
-        buttonSelector,
-      );
-
-      console.log('Кнопка активна. Отправляем Space...');
-
-      const button = await page.$(buttonSelector);
-      if (!button) throw new Error('Кнопка не найдена');
-
-      await button.focus();
-      await page.keyboard.press('Space'); // Нажатие пробела
-      await delay(3000);
-
-      console.log('Пост отправлен.');
-    } catch (error) {
-      console.error('Ошибка при публикации поста:', error.message);
-      throw new InternalServerErrorException('Ошибка при публикации поста');
+    await page.waitForSelector('button[data-test-id="tweetSaveButton"]:not([disabled])', { timeout: 5000 });
+  
+    const button = await page.$('button[data-test-id="tweetSaveButton"]');
+    if (!button) throw new NotFoundException("Button not fond");
+    const isButtonDisabled = await button.evaluate((btn: HTMLButtonElement) => btn.disabled);
+  
+    if (isButtonDisabled) {
+      throw new Error('Button is still disabled, cannot publish');
     }
+  
+    await button.click();
+    await delay(3000); // Ждем завершения действия
   }
+  
 
   private async savePostToDb(post: PostDto) {
     await this.prisma.post.create({
