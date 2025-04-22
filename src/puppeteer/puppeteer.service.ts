@@ -517,6 +517,8 @@ export class PuppeteerService {
     if (!button) throw new Error('Button not found (even after force)');
     await button.click();
 
+    await page.screenshot({ path: 'fail.png' }) 
+
     // Ждём появления уведомления с ссылкой на твит
     const tweetSelector = '.Notification-body a[href*="/status/"]';
     await page.waitForSelector(tweetSelector, { timeout: 50000 });
