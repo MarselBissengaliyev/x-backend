@@ -16,7 +16,7 @@ cookies/*
 cookies/
 
 generated/
-
+fail.png
 
 # OS
 .DS_Store
