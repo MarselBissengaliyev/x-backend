@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as puppeteer from 'puppeteer-core';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -57,7 +53,7 @@ export class PuppeteerService {
     const browser = await puppeteer.launch({
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
-      headless: "new" as any, // true на проде, false — локально
+      headless: 'new' as any, // true на проде, false — локально
       args,
     });
 
@@ -321,7 +317,7 @@ export class PuppeteerService {
     return puppeteer.launch({
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
-      headless: "new" as any, // true на проде, false — локально
+      headless: 'new' as any, // true на проде, false — локально
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
   }
@@ -517,7 +513,10 @@ export class PuppeteerService {
     if (!button) throw new Error('Button not found (even after force)');
     await button.click();
 
-    await page.screenshot({ path: 'fail.png' }) 
+    // Ждём небольшое время, чтобы действие завершилось
+    await delay(2000); // Добавляем задержку, например 2 секунды
+
+    await page.screenshot({ path: 'fail.png' });
 
     // Ждём появления уведомления с ссылкой на твит
     const tweetSelector = '.Notification-body a[href*="/status/"]';
