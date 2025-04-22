@@ -403,31 +403,7 @@ export class PuppeteerService {
   
       // Даем странице время на рендеринг элементов
       console.log('[handleMediaUpload] Waiting for the input element...');
-      const maxAttempts = 40; // 40 * 3сек = 2 минуты
-      let attempt = 0;
-      let postButtonReady = false;
-
-      while (attempt < maxAttempts) {
-        const result = await page.evaluate(() => {
-          const btn = document.querySelector('button[data-test-id="tweetSaveButton"]');
-          return btn && !btn.classList.contains('is-disabled') && !btn.hasAttribute('disabled');
-        });
-      
-        postButtonReady = Boolean(result); // приводим к boolean
-      
-        if (postButtonReady) break;
-      
-        console.log(`[handleMediaUpload] Attempt ${attempt + 1}: Button not ready yet...`);
-        await delay(3000);
-        attempt++;
-      }
-      
-      if (!postButtonReady) {
-        throw new Error('Post button did not become active after 2 minutes');
-      }
-      
-      console.log('[handleMediaUpload] Post button is active, clicking...');
-      await page.click('button[data-test-id="tweetSaveButton"]');
+      await delay(3000); // пауза 3 секунды
 
       const input = (await page.waitForSelector(
         '.FilePicker-callToActionFileInput',
