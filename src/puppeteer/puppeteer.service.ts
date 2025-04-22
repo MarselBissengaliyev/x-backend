@@ -22,7 +22,16 @@ export class PuppeteerService {
 
     this.logger.log('Launching browser with userAgent: ' + userAgent);
 
-    const args = ['--no-sandbox', '--disable-setuid-sandbox', '--incognito'];
+    const args = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-zygote',
+      '--single-process',
+      '--incognito'
+    ];
+    
     let proxyAuth: { username: string; password: string } | null = null;
 
     if (proxy) {
