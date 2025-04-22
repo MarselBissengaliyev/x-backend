@@ -48,7 +48,12 @@ export async function downloadImageToTempFile(
     // Проверка размера изображения
     if (!metadata.size || metadata.size <= 0 || metadata.size > 3 * 1024 * 1024) {
       console.error('[downloadImageToTempFile] Image size is either invalid or exceeds 3MB, resizing...');
-      await image.resize(targetWidth, targetHeight).toFile(filePath);
+      // Создаём новый путь для выходного файла
+      const resizedFilePath = path.join(tmpdir(), `resized-${Date.now()}${ext}`);
+      await image.resize(targetWidth, targetHeight).toFile(resizedFilePath);
+      console.log(`[downloadImageToTempFile] Resized image saved to: ${resizedFilePath}`);
+      await fs.unlink(filePath); // Удаляем исходный файл
+      return resizedFilePath; // Возвращаем путь к новому файлу
     }
 
     // Проверка на соотношение сторон 1:1
@@ -56,6 +61,8 @@ export async function downloadImageToTempFile(
       const minDimension = Math.min(metadata.width, metadata.height);
       if (minDimension > 0 && metadata.width !== metadata.height) {
         console.log('[downloadImageToTempFile] Cropping image to 1:1 aspect ratio');
+        // Создаём новый путь для выходного файла
+        const croppedFilePath = path.join(tmpdir(), `cropped-${Date.now()}${ext}`);
         await image
           .resize(minDimension, minDimension)
           .extract({
@@ -64,7 +71,10 @@ export async function downloadImageToTempFile(
             width: minDimension,
             height: minDimension,
           })
-          .toFile(filePath);
+          .toFile(croppedFilePath);
+        console.log(`[downloadImageToTempFile] Cropped image saved to: ${croppedFilePath}`);
+        await fs.unlink(filePath); // Удаляем исходный файл
+        return croppedFilePath; // Возвращаем путь к новому файлу
       }
     } else {
       console.error('[downloadImageToTempFile] Image dimensions are not available.');
