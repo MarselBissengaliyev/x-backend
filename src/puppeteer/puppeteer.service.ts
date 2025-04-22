@@ -128,6 +128,17 @@ export class PuppeteerService {
       this.logger.warn('2FA required');
       return { result: { twoFactorRequired: true }, page };
     } catch {
+      const context = page.browserContext();
+      const cookies = await context.cookies();
+      const cookiesDir = 'cookies';
+      if (!fs.existsSync(cookiesDir)) fs.mkdirSync(cookiesDir);
+      await fs.promises.writeFile(
+        `${cookiesDir}/${login}.json`,
+        JSON.stringify(cookies, null, 2),
+      );
+      this.logger.log('Cookies saved after successful login');
+      
+
       this.logger.log('Login successful without 2FA');
       return { result: { success: true }, page };
     }
