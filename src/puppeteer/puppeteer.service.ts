@@ -258,13 +258,13 @@ export class PuppeteerService {
 
     await this.togglePromotion(page, post.promoted || false);
 
-    if (post.imageUrl) {
-      const success = await this.handleMediaUpload(page, post.imageUrl);
-      if (!success) {
-        await browser.close();
-        return { success: false, message: 'Media upload failed' };
-      }
-    }
+    // if (post.imageUrl) {
+    //   const success = await this.handleMediaUpload(page, post.imageUrl);
+    //   if (!success) {
+    //     await browser.close();
+    //     return { success: false, message: 'Media upload failed' };
+    //   }
+    // }
 
     await this.publishPost(page);
     await this.savePostToDb(post);
@@ -312,7 +312,7 @@ export class PuppeteerService {
       }
     }
     const isProd = process.env.NODE_ENV === 'production';
-    
+
     return puppeteer.launch({
       executablePath:
       process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
