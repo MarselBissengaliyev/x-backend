@@ -28,7 +28,6 @@ export class PuppeteerService {
       '--disable-dev-shm-usage',
       '--disable-gpu',
       '--no-zygote',
-      '--single-process',
       '--incognito'
     ];
     
