@@ -28,9 +28,9 @@ export class PuppeteerService {
       '--disable-dev-shm-usage',
       '--disable-gpu',
       '--no-zygote',
-      '--incognito'
+      '--incognito',
     ];
-    
+
     let proxyAuth: { username: string; password: string } | null = null;
 
     if (proxy) {
@@ -57,6 +57,7 @@ export class PuppeteerService {
     }
 
     const browser = await puppeteer.launch({
+      headless: false, // или false
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
       args,
@@ -266,6 +267,9 @@ export class PuppeteerService {
         await browser.close();
         return { success: false, message: 'Media upload failed' };
       }
+      if (post.targetUrl) {
+        await this.setTargetUrlCard(page, post.targetUrl);
+      }
     }
 
     await this.insertPostContent(page, post);
@@ -319,11 +323,57 @@ export class PuppeteerService {
     }
 
     return puppeteer.launch({
+      headless: false, // или false
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
   }
+
+  private async setTargetUrlCard(page: puppeteer.Page, url: string) {
+    try {
+      const dropdownButtonSelector = 'div[data-testid="destination-dropdown"] div.FormInputWrapper--withAbsoluteEndAdornment button.FormInput';
+
+      await page.waitForSelector(dropdownButtonSelector, { visible: true, timeout: 10000 });
+  
+      // Используем boundingBox и click через evaluate, чтобы избежать overlay ошибок
+      const dropdownButton = await page.$(dropdownButtonSelector);
+      if (!dropdownButton) throw new Error('Dropdown button not found');
+  
+      const box = await dropdownButton.boundingBox();
+      if (!box) throw new Error('Dropdown button is not visible');
+  
+      await page.evaluate((selector) => {
+        const el = document.querySelector(selector) as HTMLElement;
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, dropdownButtonSelector);
+  
+      await dropdownButton.click();
+      this.logger.log('Dropdown opened');
+  
+      const optionSelector = 'li[data-testid="card-type-dropdown-WEBSITE"]';
+      await page.waitForSelector(optionSelector, { visible: true, timeout: 10000 });
+  
+      await page.click(optionSelector);
+      this.logger.log('Selected Website option');
+  
+      // Вводим URL
+      const urlInputSelector = 'input[data-test-id="mediaWebsiteCardURLInput-0"]';
+      await page.waitForSelector(urlInputSelector, { visible: true, timeout: 10000 });
+      await page.type(urlInputSelector, url, { delay: 50 });
+      this.logger.log(`Entered target URL: ${url}`);
+  
+      // Вводим заголовок
+      const headlineInputSelector = 'input[data-test-id="mediaWebsiteCardHeadlineInput-0"]';
+      await page.waitForSelector(headlineInputSelector, { visible: true, timeout: 10000 });
+      await page.type(headlineInputSelector, 'Check', { delay: 50 });
+      this.logger.log('Entered headline: Check');
+    } catch (error) {
+      this.logger.error('Error setting target URL card:', error.message);
+      throw new Error('Не удалось установить ссылку карточки Website');
+    }
+  }
+  
 
   private async loadCookies(page: puppeteer.Page, login: string) {
     const cookiePath = `cookies/${login}.json`;
@@ -365,11 +415,7 @@ export class PuppeteerService {
   private async insertPostContent(page: puppeteer.Page, post: PostDto) {
     await page.waitForSelector('.TweetTextInput-editor', { timeout: 10000 });
 
-    const fullContent = [
-      post.content.trim(),
-      post.hashtags?.trim(),
-      post.targetUrl ? `Check it out: ${post.targetUrl}` : null,
-    ]
+    const fullContent = [post.content.trim(), post.hashtags?.trim()]
       .filter(Boolean)
       .join('\n');
 
@@ -482,6 +528,15 @@ export class PuppeteerService {
         console.log(
           '[handleMediaUpload] Save button not found — skipping click',
         );
+      }
+
+      try {
+        const backButtonSelector = 'button[aria-label="Back"].Panel-headerBackButton';
+        await page.waitForSelector(backButtonSelector, { timeout: 5000 });
+        await page.click(backButtonSelector);
+        console.log('[handleMediaUpload] Clicked Back button');
+      } catch (err) {
+        console.log('[handleMediaUpload] Back button not found or click failed:', err.message);
       }
 
       return true;

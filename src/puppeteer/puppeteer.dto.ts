@@ -35,12 +35,11 @@ export class CodeDto {
 @ValidatorConstraint({ name: 'contentLength', async: false })
 export class ContentLengthValidator implements ValidatorConstraintInterface {
   validate(_: any, args: ValidationArguments) {
-    const { content, hashtags, targetUrl } = args.object as any;
+    const { content, hashtags } = args.object as any;
 
     const pieces = [
       content?.trim(),
       hashtags?.trim(),
-      targetUrl ? `Check it out: ${targetUrl}` : null,
     ].filter(Boolean);
 
     const finalText = pieces.join('\n');
