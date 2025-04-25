@@ -57,7 +57,7 @@ export class PuppeteerService {
     }
 
     const browser = await puppeteer.launch({
-      headless: false, // или false
+      headless: true, // или false
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
       args,
@@ -322,7 +322,7 @@ export class PuppeteerService {
     }
 
     return puppeteer.launch({
-      headless: false, // или false
+      headless: true, // или false
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
