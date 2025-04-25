@@ -469,7 +469,7 @@ export class PuppeteerService {
   }
 
   private async togglePromotion(page: puppeteer.Page, promoted: boolean = false) {
-    // Получаем текущее состояние чекбокса через JavaScript
+    // Получаем текущее состояние чекбокса
     const isChecked = await page.evaluate(() => {
       const checkbox = document.querySelector('[data-test-id="promotedOnlyCheckbox"] .Checkbox-input') as HTMLInputElement;
       return checkbox ? checkbox.checked : false;
@@ -477,12 +477,38 @@ export class PuppeteerService {
   
     console.log(`Current checkbox state: ${isChecked}, desired state: ${promoted}`);
   
-    // Если состояние не совпадает с желаемым, то меняем его
+    // Если состояние не совпадает с желаемым — переключаем
     if (promoted !== isChecked) {
       const checkbox = await page.$('[data-test-id="promotedOnlyCheckbox"] .Checkbox-input');
+  
       if (checkbox) {
-        await checkbox.click();  // Кликаем для переключения состояния
-        await delay(3000);  // Задержка для стабилизации состояния
+        // Кликаем и ждём, пока UI стабилизируется
+        await checkbox.click();
+        await delay(1000); // увеличенный delay
+  
+        // Проверяем новое состояние чекбокса
+        const newState = await page.evaluate(() => {
+          const checkbox = document.querySelector('[data-test-id="promotedOnlyCheckbox"] .Checkbox-input') as HTMLInputElement;
+          return checkbox ? checkbox.checked : false;
+        });
+  
+        console.log(`New checkbox state after click: ${newState}`);
+  
+        // Если всё ещё не совпадает — форсируем изменение через JS
+        if (newState !== promoted) {
+          console.warn('Click did not work, forcing checkbox value manually');
+          await page.evaluate((promoted) => {
+            const checkbox = document.querySelector('[data-test-id="promotedOnlyCheckbox"] .Checkbox-input') as HTMLInputElement;
+            if (checkbox && checkbox.checked !== promoted) {
+              checkbox.checked = promoted;
+              checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }, promoted);
+  
+          await delay(1000); // ждём после принудительного изменения
+        }
+      } else {
+        console.warn('Checkbox not found on the page');
       }
     }
   }
