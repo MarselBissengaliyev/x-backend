@@ -57,7 +57,7 @@ export class PuppeteerService {
     }
 
     const browser = await puppeteer.launch({
-      headless: true, // или false
+      headless: process.env.NODE_ENV === "production", // или false
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
       args,
@@ -322,7 +322,7 @@ export class PuppeteerService {
     }
 
     return puppeteer.launch({
-      headless: true, // или false
+      headless: process.env.NODE_ENV === "production", // или false
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -482,7 +482,7 @@ export class PuppeteerService {
       const checkbox = await page.$('[data-test-id="promotedOnlyCheckbox"] .Checkbox-input');
       if (checkbox) {
         await checkbox.click();  // Кликаем для переключения состояния
-        await delay(500);  // Задержка для стабилизации состояния
+        await delay(3000);  // Задержка для стабилизации состояния
       }
     }
   }
