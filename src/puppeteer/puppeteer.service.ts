@@ -251,7 +251,17 @@ export class PuppeteerService {
     const account = await this.getAccountOrThrow(post.accountId);
 
     const browser = await this.launchBrowser(account.proxy);
-    const page = await browser.newPage();
+    let proxyAuth: { username: string; password: string } | null = null;
+
+    let page: puppeteer.Page;
+    if (browser instanceof puppeteer.Browser) {
+      page = await browser.newPage();
+    } else {
+      page = browser;
+    }
+
+    await page.authenticate(proxyAuth);
+
     await page.setUserAgent(userAgent);
 
     await this.loadCookies(page, account.login);
@@ -296,7 +306,7 @@ export class PuppeteerService {
 
   private async launchBrowser(
     proxy: string | null,
-  ): Promise<puppeteer.Browser> {
+  ): Promise<puppeteer.Browser | puppeteer.Page> {
     const args = ['--no-sandbox', '--disable-setuid-sandbox', '--incognito'];
     let proxyAuth: { username: string; password: string } | null = null;
 
@@ -334,6 +344,7 @@ export class PuppeteerService {
       const page = await browser.newPage();
       await page.authenticate(proxyAuth);
       this.logger.log('Proxy authentication applied');
+      return page;
     }
 
     return browser;
@@ -420,6 +431,7 @@ export class PuppeteerService {
 
   private async navigateToComposer(page: puppeteer.Page) {
     await page.goto('https://ads.x.com', { waitUntil: 'networkidle2' });
+    this.logger.log('Redirected URL: ' + page.url());
 
     const match = page.url().match(/analytics\/([^/]+)\/campaigns/);
     if (!match) throw new Error('Ads Account ID не найден');
