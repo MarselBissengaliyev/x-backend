@@ -271,7 +271,7 @@ export class PuppeteerService {
     }
 
     await this.insertPostContent(page, post);
-    await this.togglePromotion(page, post.promoted || false);
+    await this.togglePromotion(page, post.promoted);
     const url = await this.publishPost(page);
     if (!url) {
       return { success: false, message: 'Url not found' };
@@ -520,6 +520,7 @@ export class PuppeteerService {
     imageUrl: string,
   ): Promise<boolean> {
     try {
+      await delay(2000)
       const selector = '[data-testid="adFormatsGroup-SINGLE_MEDIA"]';
       const singleMediaElement = await page.waitForSelector(selector, {
         timeout: 20000,
