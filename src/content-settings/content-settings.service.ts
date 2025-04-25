@@ -61,6 +61,10 @@ export class ContentSettingsService {
           size: '512x512',
         });
 
+        if (!res.data) {
+          throw new Error('Не получен URL изображения от OpenAI');
+        }
+
         const imageUrl = res.data[0]?.url;
         if (!imageUrl) {
           throw new Error('Не получен URL изображения от OpenAI');
