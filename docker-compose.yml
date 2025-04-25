@@ -1,4 +1,4 @@
-# version: '3.8'  # можно удалить как устаревшее, Docker сам выберет подходящую версию
+version: '3.8'
 
 services:
   postgres:
@@ -7,8 +7,8 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: mydatabase
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mypassword
+      POSTGRES_USER: postgres  # Изменили на 'postgres'
+      POSTGRES_PASSWORD: mypassword  # Установите нужный пароль для 'postgres'
     ports:
       - "5432:5432"
     volumes:
