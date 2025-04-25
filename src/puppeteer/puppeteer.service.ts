@@ -251,7 +251,6 @@ export class PuppeteerService {
     const account = await this.getAccountOrThrow(post.accountId);
 
     const browser = await this.launchBrowser(account.proxy);
-    let proxyAuth: { username: string; password: string } | null = null;
 
     let page: puppeteer.Page;
     if (browser instanceof puppeteer.Browser) {
@@ -259,8 +258,6 @@ export class PuppeteerService {
     } else {
       page = browser;
     }
-
-    await page.authenticate(proxyAuth);
 
     await page.setUserAgent(userAgent);
 
