@@ -57,7 +57,7 @@ export class PuppeteerService {
     }
 
     const browser = await puppeteer.launch({
-      headless: process.env.NODE_ENV === "production", // или false
+      headless: process.env.NODE_ENV === 'production', // или false
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
       args,
@@ -294,7 +294,9 @@ export class PuppeteerService {
     return account;
   }
 
-  private async launchBrowser(proxy: string | null) {
+  private async launchBrowser(
+    proxy: string | null,
+  ): Promise<puppeteer.Browser> {
     const args = ['--no-sandbox', '--disable-setuid-sandbox', '--incognito'];
     let proxyAuth: { username: string; password: string } | null = null;
 
@@ -321,12 +323,20 @@ export class PuppeteerService {
       }
     }
 
-    return puppeteer.launch({
-      headless: process.env.NODE_ENV === "production", // или false
+    const browser = await puppeteer.launch({
+      headless: process.env.NODE_ENV === 'production',
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args,
     });
+
+    if (proxyAuth) {
+      const page = await browser.newPage();
+      await page.authenticate(proxyAuth);
+      this.logger.log('Proxy authentication applied');
+    }
+
+    return browser;
   }
 
   private async setTargetUrlCard(page: puppeteer.Page, url: string) {
@@ -468,43 +478,56 @@ export class PuppeteerService {
     }, fullContent);
   }
 
-  private async togglePromotion(page: puppeteer.Page, promoted: boolean = false) {
+  private async togglePromotion(
+    page: puppeteer.Page,
+    promoted: boolean = false,
+  ) {
     // Получаем текущее состояние чекбокса
     const isChecked = await page.evaluate(() => {
-      const checkbox = document.querySelector('[data-test-id="promotedOnlyCheckbox"] .Checkbox-input') as HTMLInputElement;
+      const checkbox = document.querySelector(
+        '[data-test-id="promotedOnlyCheckbox"] .Checkbox-input',
+      ) as HTMLInputElement;
       return checkbox ? checkbox.checked : false;
     });
-  
-    console.log(`Current checkbox state: ${isChecked}, desired state: ${promoted}`);
-  
+
+    console.log(
+      `Current checkbox state: ${isChecked}, desired state: ${promoted}`,
+    );
+
     // Если состояние не совпадает с желаемым — переключаем
     if (promoted !== isChecked) {
-      const checkbox = await page.$('[data-test-id="promotedOnlyCheckbox"] .Checkbox-input');
-  
+      const checkbox = await page.$(
+        '[data-test-id="promotedOnlyCheckbox"] .Checkbox-input',
+      );
+
       if (checkbox) {
         // Кликаем и ждём, пока UI стабилизируется
         await checkbox.click();
         await delay(1000); // увеличенный delay
-  
+
         // Проверяем новое состояние чекбокса
         const newState = await page.evaluate(() => {
-          const checkbox = document.querySelector('[data-test-id="promotedOnlyCheckbox"] .Checkbox-input') as HTMLInputElement;
+          const checkbox = document.querySelector(
+            '[data-test-id="promotedOnlyCheckbox"] .Checkbox-input',
+          ) as HTMLInputElement;
           return checkbox ? checkbox.checked : false;
         });
-  
+
         console.log(`New checkbox state after click: ${newState}`);
-  
+
         // Если всё ещё не совпадает — форсируем изменение через JS
         if (newState !== promoted) {
           console.warn('Click did not work, forcing checkbox value manually');
           await page.evaluate((promoted) => {
-            const checkbox = document.querySelector('[data-test-id="promotedOnlyCheckbox"] .Checkbox-input') as HTMLInputElement;
+            const checkbox = document.querySelector(
+              '[data-test-id="promotedOnlyCheckbox"] .Checkbox-input',
+            ) as HTMLInputElement;
             if (checkbox && checkbox.checked !== promoted) {
               checkbox.checked = promoted;
               checkbox.dispatchEvent(new Event('change', { bubbles: true }));
             }
           }, promoted);
-  
+
           await delay(1000); // ждём после принудительного изменения
         }
       } else {
@@ -512,15 +535,13 @@ export class PuppeteerService {
       }
     }
   }
-  
- 
 
   private async handleMediaUpload(
     page: puppeteer.Page,
     imageUrl: string,
   ): Promise<boolean> {
     try {
-      await delay(2000)
+      await delay(2000);
       const selector = '[data-testid="adFormatsGroup-SINGLE_MEDIA"]';
       const singleMediaElement = await page.waitForSelector(selector, {
         timeout: 20000,
