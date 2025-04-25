@@ -74,9 +74,9 @@ export class PostDto {
   @IsUrl({})
   targetUrl?: string | null;
 
-  @IsOptional()
+  
   @IsBoolean({ message: 'Promoted must be a boolean value.' })
-  promoted?: boolean | null;
+  promoted: boolean ;
 }
 
 export interface PostWithMediaParserDto {

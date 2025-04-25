@@ -57,7 +57,7 @@ export class PuppeteerService {
     }
 
     const browser = await puppeteer.launch({
-      headless: true, // или false
+      headless: false, // или false
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
       args,
@@ -259,8 +259,6 @@ export class PuppeteerService {
 
     await this.closeWelcomeModalIfExists(page);
 
-    await this.togglePromotion(page, post.promoted || false);
-
     if (post.imageUrl) {
       const success = await this.handleMediaUpload(page, post.imageUrl);
       if (!success) {
@@ -273,6 +271,7 @@ export class PuppeteerService {
     }
 
     await this.insertPostContent(page, post);
+    await this.togglePromotion(page, post.promoted || false);
     const url = await this.publishPost(page);
     if (!url) {
       return { success: false, message: 'Url not found' };
@@ -323,7 +322,7 @@ export class PuppeteerService {
     }
 
     return puppeteer.launch({
-      headless: true, // или false
+      headless: false, // или false
       executablePath:
         process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -469,24 +468,26 @@ export class PuppeteerService {
     }, fullContent);
   }
 
-  private async togglePromotion(page: puppeteer.Page, promoted: boolean) {
-    const checkbox = await page.$(
-      '[data-test-id="promotedOnlyCheckbox"] .Checkbox-input',
-    );
-    if (!checkbox) return;
-
-    const isChecked = await checkbox.evaluate(
-      (el: HTMLInputElement) => el.checked,
-    );
-
-    if (promoted && !isChecked) {
-      await checkbox.click();
-      await delay(500);
-    } else if (!promoted && isChecked) {
-      await checkbox.click();
-      await delay(500);
+  private async togglePromotion(page: puppeteer.Page, promoted: boolean = false) {
+    // Получаем текущее состояние чекбокса через JavaScript
+    const isChecked = await page.evaluate(() => {
+      const checkbox = document.querySelector('[data-test-id="promotedOnlyCheckbox"] .Checkbox-input') as HTMLInputElement;
+      return checkbox ? checkbox.checked : false;
+    });
+  
+    console.log(`Current checkbox state: ${isChecked}, desired state: ${promoted}`);
+  
+    // Если состояние не совпадает с желаемым, то меняем его
+    if (promoted !== isChecked) {
+      const checkbox = await page.$('[data-test-id="promotedOnlyCheckbox"] .Checkbox-input');
+      if (checkbox) {
+        await checkbox.click();  // Кликаем для переключения состояния
+        await delay(500);  // Задержка для стабилизации состояния
+      }
     }
   }
+  
+ 
 
   private async handleMediaUpload(
     page: puppeteer.Page,
