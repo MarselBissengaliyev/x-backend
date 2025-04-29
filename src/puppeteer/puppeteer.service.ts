@@ -16,148 +16,169 @@ export class PuppeteerService {
     password,
     proxy,
     userAgent,
-  }: LoginDto): Promise<{ result: any; page: puppeteer.Page }> {
+  }: LoginDto): Promise<{ result: any; page: puppeteer.Page | null }> {
     const delay = (ms: number) =>
       new Promise((resolve) => setTimeout(resolve, ms));
-
-    this.logger.log('Launching browser with userAgent: ' + userAgent);
-
-    const args = [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--no-zygote',
-      '--incognito',
-    ];
-
-    let proxyAuth: { username: string; password: string } | null = null;
-
-    if (proxy) {
-      const proxyParts = proxy.split(':');
-
-      if (proxyParts.length < 2) {
-        throw new BadRequestException(
-          'Невалидный формат прокси. Ожидается IP:PORT или IP:PORT:LOGIN:PASSWORD',
-        );
-      }
-
-      const [ip, port, username, pwd] = proxyParts;
-      const proxyUrl = `http://${ip}:${port}`;
-      args.unshift(`--proxy-server=${proxyUrl}`);
-      this.logger.log(`Using proxy: ${proxyUrl}`);
-
-      if (username && pwd) {
-        proxyAuth = {
-          username,
-          password: pwd,
-        };
-        this.logger.log('Proxy authentication credentials set');
-      }
-    }
-
-    const browser = await puppeteer.launch({
-      headless: process.env.NODE_ENV === 'production', // или false
-      executablePath:
-        process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
-      args,
-    });
-
-    this.logger.log('Browser launched successfully');
-
-    const page = await browser.newPage();
-
-    if (proxyAuth) {
-      await page.authenticate(proxyAuth);
-      this.logger.log('Proxy authentication applied');
-    }
-
-    await page.setUserAgent(userAgent);
-    this.logger.log('New page created and userAgent set');
-
-    this.logger.log('Navigating to login page...');
-    await page.goto('https://twitter.com/i/flow/login', {
-      waitUntil: 'networkidle2',
-    });
-
-    this.logger.log('Typing login...');
-    await page.waitForSelector('input[name="text"]', { timeout: 10000 });
-    await page.type('input[name="text"]', login);
-    await page.keyboard.press('Enter');
-    await delay(2000);
-
-    // 🔐 Проверка на "Unusual login activity"
+  
+    let browser: any;
+    let page: puppeteer.Page | null = null;
     try {
-      await page.waitForSelector('h1[role="heading"]', { timeout: 3000 });
-
-      const challengeText = await page.evaluate(() => {
-        const xpath =
-          "//text()[contains(., 'There was unusual login activity on your account. To help keep your account safe, please enter your')]";
-        const result = document.evaluate(
-          xpath,
-          document,
-          null,
-          XPathResult.FIRST_ORDERED_NODE_TYPE,
-          null,
-        );
-        return result.singleNodeValue?.textContent || '';
-      });
-
-      if (
-        challengeText.includes(
-          'There was unusual login activity on your account. To help keep your account safe, please enter your',
-        )
-      ) {
-        this.logger.warn(
-          'Unusual login activity detected, waiting for user input...',
-        );
-        return { result: { challengeRequired: true }, page };
+      this.logger.log('Launching browser with userAgent: ' + userAgent);
+  
+      const args = [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-zygote',
+        '--incognito',
+      ];
+  
+      let proxyAuth: { username: string; password: string } | null = null;
+  
+      if (proxy) {
+        const proxyParts = proxy.split(':');
+  
+        if (proxyParts.length < 2) {
+          throw new BadRequestException(
+            'Невалидный формат прокси. Ожидается IP:PORT или IP:PORT:LOGIN:PASSWORD',
+          );
+        }
+  
+        const [ip, port, username, pwd] = proxyParts;
+        const proxyUrl = `http://${ip}:${port}`;
+        args.unshift(`--proxy-server=${proxyUrl}`);
+        this.logger.log(`Using proxy: ${proxyUrl}`);
+  
+        if (username && pwd) {
+          proxyAuth = {
+            username,
+            password: pwd,
+          };
+          this.logger.log('Proxy authentication credentials set');
+        }
       }
-    } catch (err) {
-      this.logger.log('No unusual activity challenge detected');
-    }
-
-    this.logger.log('Typing password...');
-    await page.waitForSelector('input[name="password"]'); // Без timeout — ждём сколько нужно
-    await page.type('input[name="password"]', password);
-    await page.keyboard.press('Enter');
-    await delay(3000);
-
-    const loginError = await page.evaluate(() => {
-      const el = document.querySelector('div[role="alert"]')?.textContent;
-      return el || '';
-    });
-
-    if (
-      loginError.toLowerCase().includes('wrong') ||
-      loginError.toLowerCase().includes('неправильный')
-    ) {
-      this.logger.warn('Login failed: ' + loginError);
-      return { result: { success: false, error: loginError }, page };
-    }
-
-    this.logger.log('Waiting for 2FA prompt or login success...');
-    try {
-      await page.waitForSelector('input[data-testid="ocfEnterTextTextInput"]', {
-        timeout: 5000,
+  
+      browser = await puppeteer.launch({
+        headless: process.env.NODE_ENV === 'production', // или false
+        executablePath:
+          process.env.CHROMIUM_EXEC_PATH || puppeteer.executablePath(),
+        args,
       });
-      this.logger.warn('2FA required');
-      return { result: { twoFactorRequired: true }, page };
-    } catch {
-      const context = page.browserContext();
-      const cookies = await context.cookies();
-      const cookiesDir = 'cookies';
-      if (!fs.existsSync(cookiesDir)) fs.mkdirSync(cookiesDir);
-      await fs.promises.writeFile(
-        `${cookiesDir}/${login}.json`,
-        JSON.stringify(cookies, null, 2),
-      );
-      this.logger.log('Cookies saved after successful login');
-
-      this.logger.log('Login successful without 2FA');
-      return { result: { success: true }, page };
+  
+      this.logger.log('Browser launched successfully');
+  
+      page = await browser.newPage();
+  
+      if (proxyAuth && page) { // Проверка, что page существует
+        await page.authenticate(proxyAuth);
+        this.logger.log('Proxy authentication applied');
+      }
+  
+      if (page) { // Проверка, что page существует
+        await page.setUserAgent(userAgent);
+        this.logger.log('New page created and userAgent set');
+  
+        this.logger.log('Navigating to login page...');
+        await page.goto('https://twitter.com/i/flow/login', {
+          waitUntil: 'networkidle2',
+        });
+  
+        this.logger.log('Typing login...');
+        await page.waitForSelector('input[name="text"]', { timeout: 10000 });
+        await page.type('input[name="text"]', login);
+        await page.keyboard.press('Enter');
+        await delay(2000);
+  
+        // 🔐 Проверка на "Unusual login activity"
+        try {
+          await page.waitForSelector('h1[role="heading"]', { timeout: 3000 });
+  
+          const challengeText = await page.evaluate(() => {
+            const xpath =
+              "//text()[contains(., 'There was unusual login activity on your account. To help keep your account safe, please enter your')]";
+            const result = document.evaluate(
+              xpath,
+              document,
+              null,
+              XPathResult.FIRST_ORDERED_NODE_TYPE,
+              null,
+            );
+            return result.singleNodeValue?.textContent || '';
+          });
+  
+          if (
+            challengeText.includes(
+              'There was unusual login activity on your account. To help keep your account safe, please enter your',
+            )
+          ) {
+            this.logger.warn(
+              'Unusual login activity detected, waiting for user input...',
+            );
+            return { result: { challengeRequired: true }, page };
+          }
+        } catch (err) {
+          this.logger.log('No unusual activity challenge detected');
+        }
+  
+        this.logger.log('Typing password...');
+        await page.waitForSelector('input[name="password"]'); // Без timeout — ждём сколько нужно
+        await page.type('input[name="password"]', password);
+        await page.keyboard.press('Enter');
+        await delay(3000);
+  
+        const loginError = await page.evaluate(() => {
+          const el = document.querySelector('div[role="alert"]')?.textContent;
+          return el || '';
+        });
+  
+        if (
+          loginError.toLowerCase().includes('wrong') ||
+          loginError.toLowerCase().includes('неправильный')
+        ) {
+          this.logger.warn('Login failed: ' + loginError);
+          return { result: { success: false, error: loginError }, page };
+        }
+  
+        this.logger.log('Waiting for 2FA prompt or login success...');
+        try {
+          await page.waitForSelector('input[data-testid="ocfEnterTextTextInput"]', {
+            timeout: 5000,
+          });
+          this.logger.warn('2FA required');
+          return { result: { twoFactorRequired: true }, page };
+        } catch {
+          const context = page.browserContext();
+          const cookies = await context.cookies();
+          const cookiesDir = 'cookies';
+          if (!fs.existsSync(cookiesDir)) fs.mkdirSync(cookiesDir);
+          await fs.promises.writeFile(
+            `${cookiesDir}/${login}.json`,
+            JSON.stringify(cookies, null, 2),
+          );
+          this.logger.log('Cookies saved after successful login');
+  
+          this.logger.log('Login successful without 2FA');
+          return { result: { success: true }, page };
+        }
+      }
+    } catch (error) {
+      this.logger.error('Error during login process:', error);
+      return { result: { success: false, error: error.message || 'Unknown error' }, page: null };
+    } finally {
+      // Закрываем браузер в любом случае
+      if (browser && 'close' in browser) {
+        await browser.close();
+      }
     }
+  
+    // Добавлено окончательное возвращение
+    return { result: { success: false, error: 'Unknown error' }, page: null };
   }
+  
+  
+  
+  
 
   async submitChallenge({
     challengeInput,
@@ -169,50 +190,62 @@ export class PuppeteerService {
     password: string;
   }) {
     this.logger.log('Submitting unusual login challenge input...');
-
-    await page.type('input[name="text"]', challengeInput);
-    await page.keyboard.press('Enter');
-    await delay(2000);
-
-    this.logger.log('Challenge input submitted. Waiting for password field...');
-
-    await page.waitForSelector('input[name="password"]', { timeout: 10000 });
-
-    // Теперь используем переданный пароль для заполнения поля пароля
-    await page.type('input[name="password"]', password);
-    await page.keyboard.press('Enter');
-
-    this.logger.log('Password entered. Waiting for login success...');
-
-    // Проверяем на 2FA
+  
     try {
-      await page.waitForSelector('input[data-testid="ocfEnterTextTextInput"]', {
-        timeout: 5000,
-      });
-      this.logger.warn('2FA required after password input');
-
-      // Если 2FA требуется, запросим код и передадим его для ввода
-      return { result: { twoFactorRequired: true }, page };
-    } catch {
-      // Ждем, пока страница перейдет в режим успешного логина или проверим ошибки
-      // await page.waitForNavigation({ waitUntil: 'networkidle2' });
-
-      const loginError = await page.evaluate(() => {
-        const el = document.querySelector('div[role="alert"]')?.textContent;
-        return el || '';
-      });
-
-      if (
-        loginError.toLowerCase().includes('wrong') ||
-        loginError.toLowerCase().includes('неправильный')
-      ) {
-        this.logger.warn('Login failed: ' + loginError);
-        return { result: { success: false, error: loginError }, page };
-      } else {
-        return { result: { success: true } };
+      await page.type('input[name="text"]', challengeInput);
+      await page.keyboard.press('Enter');
+      await delay(2000);
+  
+      this.logger.log('Challenge input submitted. Waiting for password field...');
+  
+      await page.waitForSelector('input[name="password"]', { timeout: 10000 });
+  
+      // Теперь используем переданный пароль для заполнения поля пароля
+      await page.type('input[name="password"]', password);
+      await page.keyboard.press('Enter');
+  
+      this.logger.log('Password entered. Waiting for login success...');
+  
+      // Проверяем на 2FA
+      try {
+        await page.waitForSelector('input[data-testid="ocfEnterTextTextInput"]', {
+          timeout: 5000,
+        });
+        this.logger.warn('2FA required after password input');
+  
+        // Если 2FA требуется, запросим код и передадим его для ввода
+        return { result: { twoFactorRequired: true }, page };
+      } catch {
+        // Ждем, пока страница перейдет в режим успешного логина или проверим ошибки
+        // await page.waitForNavigation({ waitUntil: 'networkidle2' });
+  
+        const loginError = await page.evaluate(() => {
+          const el = document.querySelector('div[role="alert"]')?.textContent;
+          return el || '';
+        });
+  
+        if (
+          loginError.toLowerCase().includes('wrong') ||
+          loginError.toLowerCase().includes('неправильный')
+        ) {
+          this.logger.warn('Login failed: ' + loginError);
+          return { result: { success: false, error: loginError }, page };
+        } else {
+          return { result: { success: true } };
+        }
+      }
+    } catch (error) {
+      this.logger.error('Error during challenge submission:', error);
+      return { result: { success: false, error: error.message || 'Unknown error' }, page };
+    } finally {
+      // Закрываем браузер в случае ошибки или завершения процесса
+      if (page && page.browser()) {
+        const browser = page.browser();
+        await browser.close();
       }
     }
   }
+  
 
   async submitCode({
     code,
@@ -224,70 +257,86 @@ export class PuppeteerService {
     login: string;
   }) {
     this.logger.log('Submitting 2FA code...');
-    await page.type('input[data-testid="ocfEnterTextTextInput"]', code);
-    await page.click('[data-testid="ocfEnterTextNextButton"]');
-    await page.waitForNavigation();
-    this.logger.log('2FA completed, navigation successful');
-
-    // Сохранение cookies после успешного ввода кода
+    
     try {
-      const context = page.browserContext();
-      const cookies = await context.cookies();
-      const cookiesDir = 'cookies';
-      if (!fs.existsSync(cookiesDir)) fs.mkdirSync(cookiesDir);
-      await fs.promises.writeFile(
-        `${cookiesDir}/${login}.json`, // Сохраняем cookies по URL
-        JSON.stringify(cookies, null, 2),
-      );
-      this.logger.log('Cookies saved after submitting 2FA code');
-    } catch (e) {
-      this.logger.error('Error saving cookies after submitting 2FA code', e);
+      await page.type('input[data-testid="ocfEnterTextTextInput"]', code);
+      await page.click('[data-testid="ocfEnterTextNextButton"]');
+      await page.waitForNavigation();
+      this.logger.log('2FA completed, navigation successful');
+  
+      // Сохранение cookies после успешного ввода кода
+      try {
+        const context = page.browserContext();
+        const cookies = await context.cookies();
+        const cookiesDir = 'cookies';
+        if (!fs.existsSync(cookiesDir)) fs.mkdirSync(cookiesDir);
+        await fs.promises.writeFile(
+          `${cookiesDir}/${login}.json`, // Сохраняем cookies по URL
+          JSON.stringify(cookies, null, 2),
+        );
+        this.logger.log('Cookies saved after submitting 2FA code');
+      } catch (e) {
+        this.logger.error('Error saving cookies after submitting 2FA code', e);
+      }
+  
+      return { success: true };
+    } catch (error) {
+      this.logger.error('Error during 2FA submission', error);
+      return { success: false, error: error.message || 'Unknown error' };
+    } finally {
+      // Закрываем браузер в случае ошибки или завершения процесса
+      if (page && page.browser()) {
+        const browser = page.browser();
+        await browser.close();
+        this.logger.log('Browser closed after 2FA submission');
+      }
     }
-
-    return { success: true };
   }
+  
 
   async submitPost(post: PostDto, userAgent: string) {
-    const account = await this.getAccountOrThrow(post.accountId);
-
-    const browser = await this.launchBrowser(account.proxy);
-
-    let page: puppeteer.Page;
-    if (browser instanceof puppeteer.Browser) {
-      page = await browser.newPage();
-    } else {
-      page = browser;
-    }
-
-    await page.setUserAgent(userAgent);
-
-    await this.loadCookies(page, account.login);
-    await this.navigateToComposer(page);
-
-    await this.closeWelcomeModalIfExists(page);
-
-    if (post.imageUrl) {
-      const success = await this.handleMediaUpload(page, post.imageUrl);
-      if (!success) {
+    let browser: any;
+    try {
+      const account = await this.getAccountOrThrow(post.accountId);
+  
+      browser = await this.launchBrowser(account.proxy);
+      let page: puppeteer.Page;
+      if (browser instanceof puppeteer.Browser) {
+        page = await browser.newPage();
+      } else {
+        page = browser;
+      }
+  
+      await page.setUserAgent(userAgent);
+      await this.loadCookies(page, account.login);
+      await this.navigateToComposer(page);
+  
+      await this.closeWelcomeModalIfExists(page);
+  
+      if (post.imageUrl) {
+        const success = await this.handleMediaUpload(page, post.imageUrl);
+        if (!success) return { success: false, message: 'Media upload failed' };
+        if (post.targetUrl) await this.setTargetUrlCard(page, post.targetUrl);
+      }
+  
+      await this.insertPostContent(page, post);
+      await this.togglePromotion(page, post.promoted);
+  
+      const url = await this.publishPost(page);
+      if (!url) return { success: false, message: 'Url not found' };
+  
+      await this.savePostToDb(post);
+      return { success: true, url };
+    } catch (error) {
+      console.error('Error submitting post:', error);  // Для логирования ошибок
+      return { success: false, message: error.message || 'Unknown error' };
+    } finally {
+      if (browser && 'close' in browser) {
         await browser.close();
-        return { success: false, message: 'Media upload failed' };
-      }
-      if (post.targetUrl) {
-        await this.setTargetUrlCard(page, post.targetUrl);
       }
     }
-
-    await this.insertPostContent(page, post);
-    await this.togglePromotion(page, post.promoted);
-    const url = await this.publishPost(page);
-    if (!url) {
-      return { success: false, message: 'Url not found' };
-    }
-    await this.savePostToDb(post);
-
-    await browser.close();
-    return { success: true, url };
   }
+  
 
   private async getAccountOrThrow(accountId: string) {
     const account = await this.prisma.account.findUnique({

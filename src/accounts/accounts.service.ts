@@ -27,7 +27,7 @@ export class AccountsService {
       });
 
       // Проверяем, был ли логин успешным
-      if (result.success === false) {
+      if (result.success === false || !page) {
         this.logger.warn(`Login failed for login: ${data.login}`);
         return { success: false, error: 'Invalid login or password' };
       }
