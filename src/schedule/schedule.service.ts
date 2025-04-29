@@ -127,7 +127,7 @@ export class ScheduleService {
         });
 
         // Публикация поста через Puppeteer
-        await this.puppeteerService.submitPost(
+        const result = await this.puppeteerService.submitPost(
           {
             accountId,
             content: newPost.content,
@@ -138,8 +138,22 @@ export class ScheduleService {
           },
           userAgent,
         );
-
+        
         this.logger.log('Post successfully submitted via Puppeteer');
+
+        if (result.captchaDetected) {
+          this.logger.warn('🚨 Капча обнаружена — требуется ручное вмешательство');
+        
+          await this.prisma.scheduledPost.update({
+            where: { id: scheduledPost.id },
+            data: {
+              status: 'captcha_required',
+            },
+          });
+        
+          // Можно уведомить через Telegram, Email или добавить поле для UI
+          return;
+        }
 
         // Обновляем статус задачи
         await this.prisma.scheduledPost.update({
