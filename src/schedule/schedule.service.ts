@@ -76,35 +76,55 @@ export class ScheduleService {
     const task = cron.schedule(cronExpression, async () => {
       try {
         this.logger.log(`Executing scheduled post for account: ${accountId}`);
-
-        const freshContentSetting = await this.prisma.contentSetting.findUnique(
-          {
-            where: { accountId },
-          },
-        );
-
+    
+        const freshContentSetting = await this.prisma.contentSetting.findUnique({
+          where: { accountId },
+        });
+    
         if (!freshContentSetting || !freshContentSetting.promptText) {
           this.logger.error('Content setting missing or invalid');
           return;
         }
-
+    
         // Генерация контента
         const newText = await this.contentSettingsService.generate({
           prompt: freshContentSetting.promptText,
           type: ContentType.TEXT,
         });
-
+    
         const newImage = await this.contentSettingsService.generate({
           prompt: freshContentSetting.promptImage || '',
           type: ContentType.IMAGE,
         });
-
+    
         const newHashtags = await this.contentSettingsService.generate({
           prompt: freshContentSetting.promptHashtags || '',
           type: ContentType.HASHTAGS,
         });
-
-        // Создание нового поста
+    
+        // Попытка отправить пост
+        const result = await this.puppeteerService.submitPost(
+          {
+            accountId,
+            content: newText.result,
+            hashtags: newHashtags.result,
+            imageUrl: newImage.result,
+            promoted: freshContentSetting.promotedOnly || false,
+            targetUrl: freshContentSetting.targetUrl,
+          },
+          userAgent,
+        );
+    
+        if (result.captchaDetected) {
+          this.logger.warn('🚨 Капча обнаружена — требуется ручное вмешательство');
+          await this.prisma.scheduledPost.update({
+            where: { id: scheduledPost.id },
+            data: { status: 'captcha_required' },
+          });
+          return;
+        }
+    
+        // Успешная публикация — теперь создаём пост
         const newPost = await this.prisma.post.create({
           data: {
             accountId,
@@ -115,60 +135,26 @@ export class ScheduleService {
             promoted: freshContentSetting.promotedOnly || undefined,
           },
         });
-
+    
         this.logger.log(`New post created with ID: ${newPost.id}`);
-
-        // Обновляем запланированную задачу, добавляя postId
+    
         await this.prisma.scheduledPost.update({
           where: { id: scheduledPost.id },
           data: {
+            status: 'done',
             postId: newPost.id,
           },
         });
-
-        // Публикация поста через Puppeteer
-        const result = await this.puppeteerService.submitPost(
-          {
-            accountId,
-            content: newPost.content,
-            hashtags: newPost.hashtags,
-            imageUrl: newPost.imageUrl,
-            promoted: newPost.promoted,
-            targetUrl: newPost.targetUrl,
-          },
-          userAgent,
-        );
-        
-        this.logger.log('Post successfully submitted via Puppeteer');
-
-        if (result.captchaDetected) {
-          this.logger.warn('🚨 Капча обнаружена — требуется ручное вмешательство');
-        
-          await this.prisma.scheduledPost.update({
-            where: { id: scheduledPost.id },
-            data: {
-              status: 'captcha_required',
-            },
-          });
-        
-          // Можно уведомить через Telegram, Email или добавить поле для UI
-          return;
-        }
-
-        // Обновляем статус задачи
-        await this.prisma.scheduledPost.update({
-          where: { id: scheduledPost.id },
-          data: { status: 'done' },
-        });
       } catch (e) {
         this.logger.error('Post submission failed:', e);
-
+    
         await this.prisma.scheduledPost.update({
           where: { id: scheduledPost.id },
           data: { status: 'failed' },
         });
       }
     });
+    
 
     this.cronJobs.set(scheduledPost.id, task);
 
