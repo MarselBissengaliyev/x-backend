@@ -3,22 +3,22 @@ import * as fs from 'fs';  // Используем обычный fs для си
 import { tmpdir } from 'os';
 import * as path from 'path';
 import * as sharp from 'sharp';
-import * as child_process from 'child_process';
 
 export const delay = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function deleteFile(filePath: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    child_process.exec(`del "${filePath}"`, (err, stdout, stderr) => {
+    fs.unlink(filePath, (err) => {
       if (err) {
-        reject(new Error(`Error deleting file: ${stderr}`));
+        reject(new Error(`Error deleting file: ${err.message}`));
       } else {
         resolve();
       }
     });
   });
 }
+
 
 export async function downloadImageToTempFile(
   url: string,
