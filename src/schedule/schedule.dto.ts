@@ -25,18 +25,6 @@ export class SchedulePostDto {
   )
   cronExpression: string;
 
-  @IsOptional()
-  @IsString()
-  @Matches(/^https?:\/\/[^\s/$.?#].[^\s]*$/, { message: 'Invalid URL format' })
-  postUrl?: string; // Опционально: URL для поста, если необходимо указать
-
-  @IsOptional()
-  @IsString()
-  @Matches(/^[a-zA-Z0-9,#@_+\-\.\*\s]+$/, {
-    message: 'Invalid characters in post caption',
-  })
-  postCaption?: string; // Опционально: описание или заголовок для поста
-
   @IsString()
   @IsNotEmpty()
   promptText: string;
@@ -49,6 +37,10 @@ export class SchedulePostDto {
   @IsString()
   promptHashtags?: string;
 
+  @IsOptional()
+  @IsString()
+  imagesSource?: string;
+
   @IsUrl()
   @IsOptional()
   @IsNotEmpty()
@@ -56,11 +48,4 @@ export class SchedulePostDto {
 
   @IsBoolean()
   promotedOnly: boolean;
-
-  @IsOptional()
-  @IsString()
-  @Matches(/^(image|image_analysis)$/, {
-    message: 'method должен быть либо "image", либо "image_analysis"',
-  })
-  method?: 'image' | 'image_analysis'; // Optional, default to 'image' if not provided
 }

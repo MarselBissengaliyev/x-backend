@@ -20,7 +20,6 @@ export class ContentGenerationService {
   async generate({
     prompt,
     type,
-    imageUrl,
   }: GenerateDto): Promise<{ result: string }> {
     this.logger.log(
       `Генерация контента типа "${type}" с промптом: "${prompt}"`,
@@ -45,70 +44,6 @@ export class ContentGenerationService {
 
         this.logger.log(`Изображение сгенерировано успешно: ${imageUrl}`);
         return { result: imageUrl };
-      }
-
-      if (type === 'image_analysis') {
-        if (!imageUrl) {
-          throw new Error('imageUrl обязателен для анализа изображения');
-        }
-
-        // Скачиваем изображение
-        const response = await fetch(imageUrl);
-        const buffer = await response.arrayBuffer();
-
-        // Преобразуем в Base64
-        const base64Image = Buffer.from(buffer).toString('base64');
-
-        // Получаем описание изображения с помощью vision
-        const visionCompletion = await this.openai.chat.completions.create({
-          model: 'gpt-4-turbo',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text:
-                    prompt || 'Что изображено и как это можно визуализировать?',
-                },
-                {
-                  type: 'image_url',
-                  image_url: {
-                    url: `data:image/jpeg;base64,${base64Image}`,
-                  },
-                },
-              ],
-            },
-          ],
-        });
-
-        const description = visionCompletion.choices[0]?.message?.content;
-        if (!description) {
-          throw new Error('Не удалось получить описание изображения');
-        }
-
-        this.logger.log(`AI описание изображения: ${description}`);
-
-        // Генерируем новое изображение по описанию
-        const imageGen = await this.openai.images.generate({
-          prompt: description,
-          n: 1,
-          size: '512x512',
-        });
-
-        if (!imageGen.data || imageGen.data.length === 0 || !imageGen.data[0].url) {
-          throw new Error('Image generation failed or returned no data.');
-        }
-
-        const generatedImageUrl = imageGen.data[0]?.url;
-        if (!generatedImageUrl) {
-          throw new Error('Не удалось сгенерировать новое изображение');
-        }
-
-        this.logger.log(
-          `Новое изображение успешно сгенерировано: ${generatedImageUrl}`,
-        );
-        return { result: generatedImageUrl };
       }
 
       const completion = await this.openai.chat.completions.create({

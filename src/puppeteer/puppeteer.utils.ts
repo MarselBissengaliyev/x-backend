@@ -1,5 +1,5 @@
 import axios from 'axios';
-import * as fs from 'fs';  // Используем обычный fs для синхронных операций
+import * as fs from 'fs'; // Используем обычный fs для синхронных операций
 import { tmpdir } from 'os';
 import * as path from 'path';
 import * as sharp from 'sharp';
@@ -19,118 +19,149 @@ export async function deleteFile(filePath: string): Promise<void> {
   });
 }
 
+const MAX_FILE_SIZE_MB = 3;
+const MAX_WIDTH = 2000;
+const MAX_HEIGHT = 2000;
 
 export async function downloadImageToTempFile(
-  url: string,
+  urlOrPath: string,
   targetWidth: number,
   targetHeight: number,
 ): Promise<string> {
-  console.log('[downloadImageToTempFile] Start downloading image:', url);
+  console.log('[downloadImageToTempFile] Start:', urlOrPath);
 
-  if (!url || typeof url !== 'string' || url.trim() === '') {
-    console.error('[downloadImageToTempFile] Invalid image URL:', url);
-    throw new Error('Invalid image URL');
+  if (!urlOrPath || typeof urlOrPath !== 'string' || urlOrPath.trim() === '') {
+    throw new Error('Invalid image input');
   }
 
-  try {
-    const cleanUrl = url.split('?')[0];
-    const extMatch = cleanUrl.match(/\.\w+$/);
-    const ext = extMatch ? extMatch[0].toLowerCase() : '.jpg'; // по умолчанию .jpg
+  const isUrl = /^https?:\/\//i.test(urlOrPath);
+  const cleanInput = urlOrPath.split('?')[0];
+  const extMatch = cleanInput.match(/\.\w+$/);
+  const ext = extMatch ? extMatch[0].toLowerCase() : '.jpg';
 
-    // Проверка на разрешенные типы файлов
-    if (!['.jpg', '.jpeg', '.png'].includes(ext)) {
-      console.error('[downloadImageToTempFile] Unsupported image format:', ext);
-      throw new Error('Unsupported image format. Only PNG and JPEG are allowed.');
+  if (!['.jpg', '.jpeg', '.png'].includes(ext)) {
+    throw new Error('Unsupported image format. Only PNG and JPEG are allowed.');
+  }
+
+  const fileName = `image-${Date.now()}${ext}`;
+  const filePath = path.join(tmpdir(), fileName);
+
+  try {
+    // Загрузка или копирование файла
+    if (isUrl) {
+      const response = await axios.get(urlOrPath, {
+        responseType: 'arraybuffer',
+      });
+      await fs.promises.writeFile(filePath, response.data);
+    } else {
+      await fs.promises.copyFile(urlOrPath, filePath);
     }
 
-    const fileName = `image-${Date.now()}${ext}`;
-    const filePath = path.join(tmpdir(), fileName);
+    console.log(
+      `[downloadImageToTempFile] Saved original image to: ${filePath}`,
+    );
 
-    console.log(`[downloadImageToTempFile] Downloading to: ${filePath}`);
-
-    const response = await axios.get(url, { responseType: 'arraybuffer' });
-
-    // Сохраняем изображение временно
-    await fs.promises.writeFile(filePath, response.data);
-    console.log(`[downloadImageToTempFile] Image saved to: ${filePath}`);
-
-    // Получение размеров изображения перед изменением
     const image = sharp(filePath);
     const metadata = await image.metadata();
 
-    // Проверка размера изображения
-    if (!metadata.size || metadata.size <= 0 || metadata.size > 3 * 1024 * 1024) {
-      console.error('[downloadImageToTempFile] Image size is either invalid or exceeds 3MB, resizing...');
-      // Создаём новый путь для выходного файла
-      const resizedFilePath = path.join(tmpdir(), `resized-${Date.now()}${ext}`);
-      await image.resize(targetWidth, targetHeight).toFile(resizedFilePath);
-      console.log(`[downloadImageToTempFile] Resized image saved to: ${resizedFilePath}`);
-      
-      // Проверяем и удаляем исходный файл, если он существует
-      if (fs.existsSync(filePath)) {
-        console.log('[downloadImageToTempFile] Waiting before deleting the file...');
-        await delay(3000); // Задержка 3 секунды
-        await deleteFile(filePath); // Используем сторонний метод для удаления
-      }
+    let finalPath = filePath;
 
-      return resizedFilePath; // Возвращаем путь к новому файлу
+    // Ресайз, если размер превышает лимит
+    const stats = await fs.promises.stat(filePath);
+    if (stats.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      const resizedPath = path.join(tmpdir(), `resized-${Date.now()}${ext}`);
+      await image
+        .resize({
+          width: Math.min(metadata.width || MAX_WIDTH, MAX_WIDTH),
+          height: Math.min(metadata.height || MAX_HEIGHT, MAX_HEIGHT),
+          fit: 'inside',
+        })
+        .toFile(resizedPath);
+      await deleteFileSafe(filePath);
+      finalPath = resizedPath;
+      console.log(
+        `[downloadImageToTempFile] Resized image due to size > ${MAX_FILE_SIZE_MB}MB: ${resizedPath}`,
+      );
     }
 
-    // Проверка на соотношение сторон 1:1
-    if (metadata.width && metadata.height) {
-      const minDimension = Math.min(metadata.width, metadata.height);
-      if (minDimension > 0 && metadata.width !== metadata.height) {
-        console.log('[downloadImageToTempFile] Cropping image to 1:1 aspect ratio');
-        // Создаём новый путь для выходного файла
-        const croppedFilePath = path.join(tmpdir(), `cropped-${Date.now()}${ext}`);
-        await image
-          .resize(minDimension, minDimension)
-          .extract({
-            left: (metadata.width - minDimension) / 2,
-            top: (metadata.height - minDimension) / 2,
-            width: minDimension,
-            height: minDimension,
-          })
-          .toFile(croppedFilePath);
-        console.log(`[downloadImageToTempFile] Cropped image saved to: ${croppedFilePath}`);
-        
-        // Проверяем и удаляем исходный файл, если он существует
-        if (fs.existsSync(filePath)) {
-          console.log('[downloadImageToTempFile] Waiting before deleting the file...');
-          await delay(3000); // Задержка 3 секунды
-          await deleteFile(filePath); // Используем сторонний метод для удаления
-        }
-
-        return croppedFilePath; // Возвращаем путь к новому файлу
-      }
-    } else {
-      console.error('[downloadImageToTempFile] Image dimensions are not available.');
-      throw new Error('Image dimensions are not available.');
+    // Кроп до квадрата
+    const finalImage = sharp(finalPath);
+    const finalMetadata = await finalImage.metadata();
+    if (finalMetadata.width !== finalMetadata.height) {
+      const minDim = Math.min(finalMetadata.width!, finalMetadata.height!);
+      const croppedPath = path.join(tmpdir(), `cropped-${Date.now()}${ext}`);
+      await finalImage
+        .extract({
+          left: Math.floor((finalMetadata.width! - minDim) / 2),
+          top: Math.floor((finalMetadata.height! - minDim) / 2),
+          width: minDim,
+          height: minDim,
+        })
+        .toFile(croppedPath);
+      await deleteFileSafe(finalPath);
+      finalPath = croppedPath;
+      console.log(`[downloadImageToTempFile] Cropped to 1:1: ${croppedPath}`);
     }
 
-    // Масштабируем изображение до целевого размера
-    const outputFilePath = path.join(tmpdir(), `resized-${Date.now()}${ext}`);
-    console.log(`[downloadImageToTempFile] Resizing image to ${targetWidth}x${targetHeight}`);
-
-    await image
+    // Финальный ресайз
+    const outputFilePath = path.join(tmpdir(), `final-${Date.now()}${ext}`);
+    await sharp(finalPath)
       .resize(targetWidth, targetHeight, {
         fit: sharp.fit.cover,
         position: sharp.strategy.entropy,
       })
       .toFile(outputFilePath);
 
-    console.log(`[downloadImageToTempFile] Resized image saved to: ${outputFilePath}`);
+    await deleteFileSafe(finalPath);
 
-    // Проверяем и удаляем исходное изображение, если оно не нужно
-    if (fs.existsSync(filePath)) {
-      console.log('[downloadImageToTempFile] Waiting before deleting the file...');
-      await delay(3000); // Задержка 3 секунды
-      await deleteFile(filePath); // Используем сторонний метод для удаления
-    }
-
+    console.log(
+      `[downloadImageToTempFile] Final image saved to: ${outputFilePath}`,
+    );
     return outputFilePath;
-  } catch (error) {
-    console.error('[downloadImageToTempFile] Error downloading or resizing image:', error.message);
-    throw error;
+  } catch (err: any) {
+    console.error(
+      `[downloadImageToTempFile] Error with file ${filePath}:`,
+      err.message || err,
+    );
+    throw err;
   }
 }
+
+async function deleteFileSafe(filePath: string) {
+  try {
+    await fs.promises.unlink(filePath);
+  } catch (e) {
+    console.warn(
+      `[deleteFileSafe] Failed to delete ${filePath}:`,
+      (e as any).message,
+    );
+  }
+}
+
+export function cleanTempFiles(olderThanMinutes: number = 60): void {
+  const dir = tmpdir();
+  const threshold = Date.now() - olderThanMinutes * 60 * 1000;
+
+  fs.readdir(dir, (err, files) => {
+    if (err) return console.error('[TempCleaner] Failed to read tmp dir:', err);
+
+    files.forEach((file) => {
+      if (!/^(image|resized|cropped|final)-/.test(file)) return;
+      const fullPath = path.join(dir, file);
+
+      fs.stat(fullPath, (err, stats) => {
+        if (err || stats.mtimeMs > threshold) return;
+        fs.unlink(fullPath, (err) => {
+          if (err)
+            console.error(
+              `[TempCleaner] Failed to delete ${file}:`,
+              err.message,
+            );
+        });
+      });
+    });
+  });
+}
+
+// Автозапуск по расписанию (например, каждый час)
+setInterval(() => cleanTempFiles(30), 60 * 60 * 1000);

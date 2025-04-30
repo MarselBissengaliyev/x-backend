@@ -7,6 +7,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { PuppeteerModule } from './puppeteer/puppeteer.module';
 import { ScheduleModule } from './schedule/schedule.module';
 import { ContentGenerationModule } from './content-generation/content-generation.module';
+import { GoogleDriveModule } from './google-drive/google-drive.module';
 
 @Module({
   controllers: [AppController],
@@ -20,6 +21,7 @@ import { ContentGenerationModule } from './content-generation/content-generation
     ContentGenerationModule,
     PuppeteerModule,
     ScheduleModule,
+    GoogleDriveModule,
   ],
 })
 export class AppModule {}

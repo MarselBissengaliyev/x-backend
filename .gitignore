@@ -18,6 +18,9 @@ cookies/
 generated/
 fail.png
 
+downloads/*
+downloads
+
 # OS
 .DS_Store
 
