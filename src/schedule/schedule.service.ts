@@ -74,61 +74,70 @@ export class ScheduleService {
     const task = cron.schedule(cronExpression, async () => {
       try {
         this.logger.log(`Executing scheduled post for account: ${accountId}`);
-
+    
         const existingAccount = await this.prisma.account.findUnique({
           where: { id: accountId },
         });
-
+    
         if (!existingAccount) {
           this.logger.warn(
             `Account ${accountId} not found. Stopping cron job.`,
           );
-
+    
           // Удаляем cron-задачу и запись в scheduledPost
           task.stop();
           this.cronJobs.delete(scheduledPost.id);
-
+    
           await this.prisma.scheduledPost.delete({
             where: { id: scheduledPost.id },
           });
           return;
         }
+    
+        // Параллельная генерация контента
+        const tasks = [
+          this.contentSettingsService.generate({
+            prompt: dto.promptText,
+            type: ContentType.TEXT,
+          }),
+        ];
+        
+        if (dto.promptImage) {
+          tasks.push(
+            this.contentSettingsService.generate({
+              prompt: dto.promptImage,
+              type: dto.method === ContentType.IMAGE_ANALYSIS
+                ? ContentType.IMAGE_ANALYSIS
+                : ContentType.IMAGE,
+              imageUrl: dto.promptImage,
+            })
+          );
+        }
+        
+        if (dto.promptHashtags) {
+          tasks.push(
+            this.contentSettingsService.generate({
+              prompt: dto.promptHashtags,
+              type: ContentType.HASHTAGS,
+            })
+          );
+        }
 
-        // Генерация контента
-        const newText = await this.contentSettingsService.generate({
-          prompt: dto.promptText,
-          type: ContentType.TEXT,
-        });
-
-        const imageType =
-          dto.method === ContentType.IMAGE_ANALYSIS
-            ? ContentType.IMAGE_ANALYSIS
-            : ContentType.IMAGE;
-
-        const newImage = await this.contentSettingsService.generate({
-          prompt: dto.promptImage || '',
-          type: imageType,
-          imageUrl: dto.promptImage || undefined, // если нужно для анализа
-        });
-
-        const newHashtags = await this.contentSettingsService.generate({
-          prompt: dto.promptHashtags || '',
-          type: ContentType.HASHTAGS,
-        });
-
+        const [newText, newImage, newHashtags] = await Promise.all(tasks);
+    
         // Попытка отправить пост
         const result = await this.puppeteerService.submitPost(
           {
             accountId,
             content: newText.result,
-            hashtags: newHashtags.result,
-            imageUrl: newImage.result,
+            hashtags: newHashtags ? newHashtags.result : null,
+            imageUrl: newImage ? newImage.result : null,
             promoted: dto.promotedOnly || false,
             targetUrl: dto.targetUrl,
           },
           userAgent,
         );
-
+    
         if (result.captchaDetected) {
           this.logger.warn(
             '🚨 Капча обнаружена — требуется ручное вмешательство',
@@ -139,21 +148,28 @@ export class ScheduleService {
           });
           return;
         }
+    
+        if (!result.success) {
+          this.logger.warn('🚨 Ошибка при отправке поста', result.message);
+          throw new Error("Ошибка при создании поста");
+        }
 
+        
+    
         // Успешная публикация — теперь создаём пост
         const newPost = await this.prisma.post.create({
           data: {
             accountId,
             content: newText.result,
-            imageUrl: newImage.result,
-            hashtags: newHashtags.result,
+            imageUrl: newImage ? newImage.result : "",
+            hashtags: newHashtags ? newHashtags.result : "",
             targetUrl: dto.targetUrl,
             promoted: dto.promotedOnly || undefined,
           },
         });
-
+    
         this.logger.log(`New post created with ID: ${newPost.id}`);
-
+    
         await this.prisma.scheduledPost.update({
           where: { id: scheduledPost.id },
           data: {
@@ -162,13 +178,14 @@ export class ScheduleService {
         });
       } catch (e) {
         this.logger.error('Post submission failed:', e);
-
+    
         await this.prisma.scheduledPost.update({
           where: { id: scheduledPost.id },
           data: { status: 'failed' },
         });
       }
     });
+    
 
     this.cronJobs.set(scheduledPost.id, task);
 
