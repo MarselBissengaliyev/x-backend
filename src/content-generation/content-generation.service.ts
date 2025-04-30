@@ -96,6 +96,10 @@ export class ContentGenerationService {
           size: '512x512',
         });
 
+        if (!imageGen.data || imageGen.data.length === 0 || !imageGen.data[0].url) {
+          throw new Error('Image generation failed or returned no data.');
+        }
+
         const generatedImageUrl = imageGen.data[0]?.url;
         if (!generatedImageUrl) {
           throw new Error('Не удалось сгенерировать новое изображение');
