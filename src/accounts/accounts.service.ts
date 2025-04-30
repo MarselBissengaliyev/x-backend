@@ -160,7 +160,6 @@ export class AccountsService {
       const accounts = await this.prisma.account.findMany({
         include: {
           posts: true, // Включаем посты
-          contentSettings: true,
           ScheduledPost: true,
         },
       });
@@ -197,6 +196,18 @@ export class AccountsService {
       await this.prisma.account.delete({
         where: { id: accountId },
       });
+
+    // Удаляем сессию, если она есть
+    if (this.sessions.has(accountId)) {
+      const session = this.sessions.get(accountId);
+      if (session?.page && !session.page.isClosed()) {
+        await session.page.close().catch(err =>
+          this.logger.warn(`Failed to close Puppeteer page for account ${accountId}: ${err.message}`),
+        );
+      }
+      this.sessions.delete(accountId);
+      this.logger.log(`Session for account ${accountId} cleared`);
+    }
 
       this.logger.log(`Account with ID ${accountId} deleted successfully`);
       return { success: true, message: `Account with ID ${accountId} deleted successfully` };

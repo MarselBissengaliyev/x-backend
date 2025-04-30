@@ -11,7 +11,7 @@ export class PuppeteerService {
 
   constructor(private prisma: PrismaService) {}
 
-  async login({
+  async   login({
     login,
     password,
     proxy,
@@ -319,7 +319,6 @@ export class PuppeteerService {
 
       await page.setUserAgent(userAgent);
       await this.loadCookies(page, account.login);
-      await this.navigateToComposer(page);
 
       await this.navigateToComposer(page);
 
@@ -638,29 +637,29 @@ export class PuppeteerService {
         timeout: 20000,
       });
       if (!singleMediaElement) return false;
-
+  
       await page.evaluate((sel) => {
         const el = document.querySelector(sel);
         el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, selector);
-
+  
       await singleMediaElement.focus();
       await page.keyboard.press('Space');
-
+  
       await page.waitForSelector('button[data-test-id="addMediaButton"]', {
         timeout: 20000,
       });
       await page.click('button[data-test-id="addMediaButton"]');
-
+  
       // Скачиваем и обрабатываем изображение
       const localPath = await downloadImageToTempFile(imageUrl, 800, 800);
       console.log('[handleMediaUpload] Image saved to:', localPath);
-
+  
       const input = (await page.waitForSelector(
         '.FilePicker-callToActionFileInput',
         { timeout: 20000 }, // Увеличили таймаут
       )) as puppeteer.ElementHandle<HTMLInputElement>;
-
+  
       if (!input) {
         console.error('[handleMediaUpload] Image input not found');
         return false;
@@ -669,14 +668,22 @@ export class PuppeteerService {
         '[handleMediaUpload] Input element found, uploading image...',
       );
       await input.uploadFile(localPath);
-
+  
+      // Добавим задержку перед удалением файла
+      await delay(1000); // Убедимся, что файл не используется
+  
       // Удаляем временный файл после использования
-      await fs.promises.unlink(localPath);
-
+      try {
+        await fs.promises.unlink(localPath);
+        console.log('[handleMediaUpload] Temporary file deleted:', localPath);
+      } catch (e) {
+        console.warn('[handleMediaUpload] Failed to delete file:', localPath, e.message);
+      }
+  
       // Нажимаем кнопку Save
       try {
         await page.waitForSelector('button.Button--small', { timeout: 5000 });
-
+  
         const buttons = await page.$$('button.Button--small');
         for (const btn of buttons) {
           const text = await btn.evaluate((el) => el.textContent?.trim());
@@ -691,14 +698,14 @@ export class PuppeteerService {
           '[handleMediaUpload] Save button not found — skipping click',
         );
       }
-
+  
       try {
         const backButtonSelector =
           'button[aria-label="Back"].Panel-headerBackButton';
         await page.waitForSelector(backButtonSelector, { timeout: 5000 });
         await page.click(backButtonSelector);
         console.log('[handleMediaUpload] Clicked Back button');
-
+  
         await delay(2000);
       } catch (err) {
         console.log(
@@ -706,7 +713,7 @@ export class PuppeteerService {
           err.message,
         );
       }
-
+  
       return true;
     } catch (err) {
       console.error(
@@ -717,6 +724,7 @@ export class PuppeteerService {
       return false;
     }
   }
+  
 
   private async publishPost(page: puppeteer.Page): Promise<string> {
     await page.waitForSelector('button[data-test-id="tweetSaveButton"]', {

@@ -1,11 +1,24 @@
 import axios from 'axios';
-import * as fs from 'fs/promises';
+import * as fs from 'fs';  // Используем обычный fs для синхронных операций
 import { tmpdir } from 'os';
 import * as path from 'path';
 import * as sharp from 'sharp';
+import * as child_process from 'child_process';
 
 export const delay = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
+
+export async function deleteFile(filePath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    child_process.exec(`del "${filePath}"`, (err, stdout, stderr) => {
+      if (err) {
+        reject(new Error(`Error deleting file: ${stderr}`));
+      } else {
+        resolve();
+      }
+    });
+  });
+}
 
 export async function downloadImageToTempFile(
   url: string,
@@ -38,7 +51,7 @@ export async function downloadImageToTempFile(
     const response = await axios.get(url, { responseType: 'arraybuffer' });
 
     // Сохраняем изображение временно
-    await fs.writeFile(filePath, response.data);
+    await fs.promises.writeFile(filePath, response.data);
     console.log(`[downloadImageToTempFile] Image saved to: ${filePath}`);
 
     // Получение размеров изображения перед изменением
@@ -52,7 +65,14 @@ export async function downloadImageToTempFile(
       const resizedFilePath = path.join(tmpdir(), `resized-${Date.now()}${ext}`);
       await image.resize(targetWidth, targetHeight).toFile(resizedFilePath);
       console.log(`[downloadImageToTempFile] Resized image saved to: ${resizedFilePath}`);
-      await fs.unlink(filePath); // Удаляем исходный файл
+      
+      // Проверяем и удаляем исходный файл, если он существует
+      if (fs.existsSync(filePath)) {
+        console.log('[downloadImageToTempFile] Waiting before deleting the file...');
+        await delay(3000); // Задержка 3 секунды
+        await deleteFile(filePath); // Используем сторонний метод для удаления
+      }
+
       return resizedFilePath; // Возвращаем путь к новому файлу
     }
 
@@ -73,7 +93,14 @@ export async function downloadImageToTempFile(
           })
           .toFile(croppedFilePath);
         console.log(`[downloadImageToTempFile] Cropped image saved to: ${croppedFilePath}`);
-        await fs.unlink(filePath); // Удаляем исходный файл
+        
+        // Проверяем и удаляем исходный файл, если он существует
+        if (fs.existsSync(filePath)) {
+          console.log('[downloadImageToTempFile] Waiting before deleting the file...');
+          await delay(3000); // Задержка 3 секунды
+          await deleteFile(filePath); // Используем сторонний метод для удаления
+        }
+
         return croppedFilePath; // Возвращаем путь к новому файлу
       }
     } else {
@@ -94,8 +121,12 @@ export async function downloadImageToTempFile(
 
     console.log(`[downloadImageToTempFile] Resized image saved to: ${outputFilePath}`);
 
-    // Удаляем исходное изображение, если не нужно
-    await fs.unlink(filePath);
+    // Проверяем и удаляем исходное изображение, если оно не нужно
+    if (fs.existsSync(filePath)) {
+      console.log('[downloadImageToTempFile] Waiting before deleting the file...');
+      await delay(3000); // Задержка 3 секунды
+      await deleteFile(filePath); // Используем сторонний метод для удаления
+    }
 
     return outputFilePath;
   } catch (error) {

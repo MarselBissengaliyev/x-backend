@@ -2,12 +2,11 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
-  Logger,
-  NotFoundException,
+  Logger
 } from '@nestjs/common';
 import * as cron from 'node-cron';
-import { ContentType } from 'src/content-settings/content-settings.dto';
-import { ContentSettingsService } from '../content-settings/content-settings.service';
+import { ContentType } from 'src/content-generation/content-generation.dto';
+import { ContentGenerationService } from 'src/content-generation/content-generation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PuppeteerService } from '../puppeteer/puppeteer.service';
 import { SchedulePostDto } from './schedule.dto';
@@ -22,11 +21,19 @@ export class ScheduleService {
   constructor(
     private prisma: PrismaService,
     private puppeteerService: PuppeteerService,
-    private contentSettingsService: ContentSettingsService,
+    private contentSettingsService: ContentGenerationService,
   ) {}
 
   async schedulePost(dto: SchedulePostDto, userAgent: string) {
-    const { accountId, cronExpression } = dto;
+    const {
+      accountId,
+      cronExpression,
+      promotedOnly,
+      promptText,
+      targetUrl,
+      promptImage,
+      promptHashtags,
+    } = dto;
     this.logger.log(
       `Scheduling post for account: ${accountId} with cron: ${cronExpression}`,
     );
@@ -40,23 +47,8 @@ export class ScheduleService {
       throw new Error('Account not found');
     }
 
-    const contentSetting = await this.prisma.contentSetting.findUnique({
-      where: { accountId },
-    });
-
-    if (!contentSetting) {
-      this.logger.error('Content setting not found for account:', accountId);
-      throw new NotFoundException(
-        'Content setting not found, create ручной пост',
-      );
-    }
-
-    if (!contentSetting.promptText) {
-      this.logger.error(
-        'Content settings promptText empty for account:',
-        accountId,
-      );
-      throw new Error('Content settings promptText empty');
+    if (!cronExpression) {
+      throw new Error('Cron expression not found');
     }
 
     // Сохраняем запланированную задачу без поста сразу
@@ -65,6 +57,12 @@ export class ScheduleService {
         accountId,
         scheduledAt: getNextDateFromCron(cronExpression),
         status: 'pending',
+        cronExpression,
+        promotedOnly,
+        promptText,
+        targetUrl,
+        promptImage,
+        promptHashtags,
       },
     });
 
@@ -76,32 +74,48 @@ export class ScheduleService {
     const task = cron.schedule(cronExpression, async () => {
       try {
         this.logger.log(`Executing scheduled post for account: ${accountId}`);
-    
-        const freshContentSetting = await this.prisma.contentSetting.findUnique({
-          where: { accountId },
+
+        const existingAccount = await this.prisma.account.findUnique({
+          where: { id: accountId },
         });
-    
-        if (!freshContentSetting || !freshContentSetting.promptText) {
-          this.logger.error('Content setting missing or invalid');
+
+        if (!existingAccount) {
+          this.logger.warn(
+            `Account ${accountId} not found. Stopping cron job.`,
+          );
+
+          // Удаляем cron-задачу и запись в scheduledPost
+          task.stop();
+          this.cronJobs.delete(scheduledPost.id);
+
+          await this.prisma.scheduledPost.delete({
+            where: { id: scheduledPost.id },
+          });
           return;
         }
-    
+
         // Генерация контента
         const newText = await this.contentSettingsService.generate({
-          prompt: freshContentSetting.promptText,
+          prompt: dto.promptText,
           type: ContentType.TEXT,
         });
-    
+
+        const imageType =
+          dto.method === ContentType.IMAGE_ANALYSIS
+            ? ContentType.IMAGE_ANALYSIS
+            : ContentType.IMAGE;
+
         const newImage = await this.contentSettingsService.generate({
-          prompt: freshContentSetting.promptImage || '',
-          type: ContentType.IMAGE,
+          prompt: dto.promptImage || '',
+          type: imageType,
+          imageUrl: dto.promptImage || undefined, // если нужно для анализа
         });
-    
+
         const newHashtags = await this.contentSettingsService.generate({
-          prompt: freshContentSetting.promptHashtags || '',
+          prompt: dto.promptHashtags || '',
           type: ContentType.HASHTAGS,
         });
-    
+
         // Попытка отправить пост
         const result = await this.puppeteerService.submitPost(
           {
@@ -109,21 +123,23 @@ export class ScheduleService {
             content: newText.result,
             hashtags: newHashtags.result,
             imageUrl: newImage.result,
-            promoted: freshContentSetting.promotedOnly || false,
-            targetUrl: freshContentSetting.targetUrl,
+            promoted: dto.promotedOnly || false,
+            targetUrl: dto.targetUrl,
           },
           userAgent,
         );
-    
+
         if (result.captchaDetected) {
-          this.logger.warn('🚨 Капча обнаружена — требуется ручное вмешательство');
+          this.logger.warn(
+            '🚨 Капча обнаружена — требуется ручное вмешательство',
+          );
           await this.prisma.scheduledPost.update({
             where: { id: scheduledPost.id },
             data: { status: 'captcha_required' },
           });
           return;
         }
-    
+
         // Успешная публикация — теперь создаём пост
         const newPost = await this.prisma.post.create({
           data: {
@@ -131,30 +147,28 @@ export class ScheduleService {
             content: newText.result,
             imageUrl: newImage.result,
             hashtags: newHashtags.result,
-            targetUrl: freshContentSetting.targetUrl,
-            promoted: freshContentSetting.promotedOnly || undefined,
+            targetUrl: dto.targetUrl,
+            promoted: dto.promotedOnly || undefined,
           },
         });
-    
+
         this.logger.log(`New post created with ID: ${newPost.id}`);
-    
+
         await this.prisma.scheduledPost.update({
           where: { id: scheduledPost.id },
           data: {
             status: 'done',
-            postId: newPost.id,
           },
         });
       } catch (e) {
         this.logger.error('Post submission failed:', e);
-    
+
         await this.prisma.scheduledPost.update({
           where: { id: scheduledPost.id },
           data: { status: 'failed' },
         });
       }
     });
-    
 
     this.cronJobs.set(scheduledPost.id, task);
 
@@ -168,6 +182,7 @@ export class ScheduleService {
         where: { id: scheduledPostId },
       });
       const task = this.cronJobs.get(scheduledPostId);
+
       if (task) {
         task.stop();
         this.cronJobs.delete(scheduledPostId);
@@ -199,7 +214,6 @@ export class ScheduleService {
     this.logger.log(`Fetching scheduled posts for account: ${accountId}`);
     return this.prisma.scheduledPost.findMany({
       where: { accountId },
-      include: { post: true },
     });
   }
 }

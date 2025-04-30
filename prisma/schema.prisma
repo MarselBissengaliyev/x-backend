@@ -23,7 +23,6 @@ model Account {
   method          Int // 1 или 2
   userAgent       String
   posts           Post[] // Без @relation(onDelete: Cascade)
-  contentSettings ContentSetting? // Без onDelete: Cascade
   createdAt       DateTime        @default(now())
   ScheduledPost   ScheduledPost[] // Без onDelete: Cascade
 }
@@ -39,33 +38,26 @@ model Post {
   createdAt DateTime @default(now())
 
   account       Account         @relation(fields: [accountId], references: [id], onDelete: Cascade) // Устанавливаем каскадное удаление
-  ScheduledPost ScheduledPost[] // Без onDelete: Cascade
-}
-
-model ContentSetting {
-  id             String   @id @default(uuid())
-  accountId      String   @unique
-  promptText     String?
-  promptImage    String?
-  promptHashtags String?
-  imageSource    String?
-  targetUrl      String?
-  autoPost       Boolean? @default(false)
-  cronExpression String?
-  promotedOnly   Boolean? @default(false)
-  useAiOnImage   Boolean? // Только для метода 2
-
-  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade) // Устанавливаем каскадное удаление
 }
 
 model ScheduledPost {
-  id          String   @id @default(uuid())
-  accountId   String
-  scheduledAt DateTime
-  status      String // pending, done, failed
-  createdAt   DateTime @default(now())
-  postId      String?
+  id              String   @id @default(uuid())
+  accountId       String
+  scheduledAt     DateTime
+  status          String   // pending, done, failed
+  createdAt       DateTime @default(now())
 
-  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade) // Устанавливаем каскадное удаление
-  post    Post?   @relation(fields: [postId], references: [id], onDelete: Cascade) // Устанавливаем каскадное удаление
+  // Отдельные поля для автопостинга
+  promptText      String?
+  promptImage     String?
+  promptHashtags  String?
+  imageSource     String?
+  targetUrl       String?
+  autoPost        Boolean? @default(false)
+  cronExpression  String?
+  promotedOnly    Boolean? @default(false)
+  useAiOnImage    Boolean? // Только для метода 2
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
+
