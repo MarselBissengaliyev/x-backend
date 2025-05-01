@@ -320,11 +320,11 @@ export class PuppeteerService {
       await page.setUserAgent(userAgent);
       await this.loadCookies(page, account.login);
 
-      await this.navigateToComposer(page);
-
+      const result = await this.navigateToComposer(page);
+      await delay(3000); // или даже 3000
       // 👉 Сразу после перехода проверяем редирект на капчу
       const isCaptcha = await this.checkCaptcha(page);
-      if (isCaptcha) {
+      if (isCaptcha || result?.CAPTCHA_REQUIRED) {
         this.logger.warn(
           '⚠️ Обнаружена капча на странице x.com/account/access',
         );
@@ -364,11 +364,37 @@ export class PuppeteerService {
   }
 
   async checkCaptcha(page: puppeteer.Page): Promise<boolean> {
-    const currentUrl = page.url();
-    if (currentUrl.includes('x.com/account/access')) {
-      console.log('Captcha page detected based on URL.');
+    const url = page.url();
+
+    // 1. Проверка по URL
+    if (
+      url.includes('/account/access') ||
+      url.includes('/challenge') ||
+      url.includes('/captcha') ||
+      url.includes('/i/flow') // иногда используется для верификации
+    ) {
+      console.log('Captcha page detected based on URL:', url);
       return true;
     }
+
+    // 2. Поиск iframe с капчей (например, от Google)
+    const captchaFrame = await page.$('iframe[src*="captcha"]');
+    if (captchaFrame) {
+      console.log('Captcha iframe detected.');
+      return true;
+    }
+
+    // 3. Поиск текстов или элементов на странице
+    const content = await page.content();
+    if (
+      content.includes('captcha') ||
+      content.includes('Please verify') ||
+      content.includes('пожалуйста подтвердите')
+    ) {
+      console.log('Captcha-related text found in page content.');
+      return true;
+    }
+
     return false;
   }
 
@@ -512,6 +538,15 @@ export class PuppeteerService {
   private async navigateToComposer(page: puppeteer.Page) {
     await page.goto('https://ads.x.com', { waitUntil: 'networkidle2' });
     this.logger.log('Redirected URL: ' + page.url());
+    const currentUrl = page.url();
+    if (currentUrl.includes('/account/access')) {
+      this.logger.warn(
+        `Blocked by access URL, likely CAPTCHA or session expired`,
+      );
+      return {
+        CAPTCHA_REQUIRED: true,
+      };
+    }
 
     const match = page.url().match(/analytics\/([^/]+)\/campaigns/);
     if (!match) throw new Error('Ads Account ID не найден');
