@@ -121,20 +121,6 @@ export class ScheduleService {
           throw new Error('Error creating post');
         }
   
-        // Успешная публикация — теперь создаём пост
-        const newPost = await this.prisma.post.create({
-          data: {
-            accountId,
-            content: newText.result,
-            imageUrl: newImage ? newImage.result : '',
-            hashtags: newHashtags ? newHashtags.result : '',
-            targetUrl: dto.targetUrl,
-            promoted: dto.promotedOnly || undefined,
-          },
-        });
-  
-        this.logger.log(`New post created with ID: ${newPost.id}`);
-  
         await this.prisma.scheduledPost.update({
           where: { id: scheduledPost.id },
           data: { status: 'done' },

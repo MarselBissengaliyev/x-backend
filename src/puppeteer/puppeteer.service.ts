@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
-import * as puppeteer from 'puppeteer';
+import puppeteer, { Browser, ElementHandle, Page } from 'puppeteer';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { LoginDto, PostDto } from './puppeteer.dto';
 import { delay, downloadImageToTempFile } from './puppeteer.utils';
@@ -16,12 +16,12 @@ export class PuppeteerService {
     password,
     proxy,
     userAgent,
-  }: LoginDto): Promise<{ result: any; page: puppeteer.Page | null }> {
+  }: LoginDto): Promise<{ result: any; page: Page | null }> {
     const delay = (ms: number) =>
       new Promise((resolve) => setTimeout(resolve, ms));
 
     let browser: any;
-    let page: puppeteer.Page | null = null;
+    let page: Page | null = null;
     try {
       this.logger.log('Launching browser with userAgent: ' + userAgent);
 
@@ -81,10 +81,30 @@ export class PuppeteerService {
         await page.setUserAgent(userAgent);
         this.logger.log('New page created and userAgent set');
 
-        this.logger.log('Navigating to login page...');
-        await page.goto('https://twitter.com/i/flow/login', {
-          waitUntil: 'networkidle2',
-        });
+        try {
+          this.logger.log('Navigating to login page...');
+          const response = await page.goto('https://twitter.com/i/flow/login', {
+            waitUntil: 'networkidle2',
+            timeout: 15000,
+          });
+        
+          const status = response?.status();
+          if (!status || status >= 400) {
+            throw new Error(`Failed to load page via proxy. Status code: ${status}`);
+          }
+        
+          // Дополнительная проверка на заглушку прокси (часто page.content содержит "ERR_" или "proxy")
+          const content = await page.content();
+          if (content.includes('ERR_') || content.toLowerCase().includes('proxy')) {
+            throw new Error('Failed to load page due to proxy connection error.');
+          }
+        } catch (err) {
+          this.logger.error('Proxy authorization failed or page unreachable:', err);
+          throw new BadRequestException(
+            'Не удалось подключиться через указанный прокси. Проверьте IP, порт и учетные данные.',
+          );
+        }
+        
 
         this.logger.log('Typing login...');
         await page.waitForSelector('input[name="text"]', { timeout: 10000 });
@@ -190,7 +210,7 @@ export class PuppeteerService {
     password,
   }: {
     challengeInput: string;
-    page: puppeteer.Page;
+    page: Page;
     password: string;
   }) {
     this.logger.log('Submitting unusual login challenge input...');
@@ -264,7 +284,7 @@ export class PuppeteerService {
     login,
   }: {
     code: string;
-    page: puppeteer.Page;
+    page: Page;
     login: string;
   }) {
     this.logger.log('Submitting 2FA code...');
@@ -310,8 +330,8 @@ export class PuppeteerService {
       const account = await this.getAccountOrThrow(post.accountId);
 
       browser = await this.launchBrowser(account.proxy);
-      let page: puppeteer.Page;
-      if (browser instanceof puppeteer.Browser) {
+      let page: Page;
+      if (browser instanceof Browser) {
         page = await browser.newPage();
       } else {
         page = browser;
@@ -363,7 +383,7 @@ export class PuppeteerService {
     }
   }
 
-  async checkCaptcha(page: puppeteer.Page): Promise<boolean> {
+  async checkCaptcha(page: Page): Promise<boolean> {
     const url = page.url();
 
     // 1. Проверка по URL
@@ -410,10 +430,15 @@ export class PuppeteerService {
     return account;
   }
 
-  private async launchBrowser(
-    proxy: string | null,
-  ): Promise<puppeteer.Browser | puppeteer.Page> {
-    const args = ['--no-sandbox', '--disable-setuid-sandbox', '--incognito'];
+  private async launchBrowser(proxy: string | null): Promise<Browser | Page> {
+    const args = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-zygote',
+      '--incognito',
+    ];
     let proxyAuth: { username: string; password: string } | null = null;
 
     if (proxy) {
@@ -456,7 +481,7 @@ export class PuppeteerService {
     return browser;
   }
 
-  private async setTargetUrlCard(page: puppeteer.Page, url: string) {
+  private async setTargetUrlCard(page: Page, url: string) {
     const dropdownReady = await page.waitForSelector(
       'div[data-testid="destination-dropdown"]',
       { visible: true, timeout: 10000 },
@@ -523,7 +548,7 @@ export class PuppeteerService {
     }
   }
 
-  private async loadCookies(page: puppeteer.Page, login: string) {
+  private async loadCookies(page: Page, login: string) {
     const cookiePath = `cookies/${login}.json`;
     if (!fs.existsSync(cookiePath)) {
       throw new Error('Сессия не найдена. Сначала выполните login().');
@@ -535,7 +560,7 @@ export class PuppeteerService {
     this.logger.log('Cookies loaded');
   }
 
-  private async navigateToComposer(page: puppeteer.Page) {
+  private async navigateToComposer(page: Page) {
     await page.goto('https://ads.x.com', { waitUntil: 'networkidle2' });
     this.logger.log('Redirected URL: ' + page.url());
     const currentUrl = page.url();
@@ -557,7 +582,7 @@ export class PuppeteerService {
     });
   }
 
-  private async closeWelcomeModalIfExists(page: puppeteer.Page) {
+  private async closeWelcomeModalIfExists(page: Page) {
     const modalCloseButton = await page.$(
       '.Dialog--modal.Dialog--withClose.is-open button[aria-label="Close"]',
     );
@@ -570,7 +595,7 @@ export class PuppeteerService {
     }
   }
 
-  private async insertPostContent(page: puppeteer.Page, post: PostDto) {
+  private async insertPostContent(page: Page, post: PostDto) {
     await page.waitForSelector('.TweetTextInput-editor', { timeout: 10000 });
 
     const fullContent = [post.content.trim(), post.hashtags?.trim()]
@@ -605,10 +630,7 @@ export class PuppeteerService {
     }, fullContent);
   }
 
-  private async togglePromotion(
-    page: puppeteer.Page,
-    promoted: boolean = false,
-  ) {
+  private async togglePromotion(page: Page, promoted: boolean = false) {
     // Получаем текущее состояние чекбокса
     const isChecked = await page.evaluate(() => {
       const checkbox = document.querySelector(
@@ -664,7 +686,7 @@ export class PuppeteerService {
   }
 
   private async handleMediaUpload(
-    page: puppeteer.Page,
+    page: Page,
     imageUrl: string,
   ): Promise<boolean> {
     try {
@@ -695,7 +717,7 @@ export class PuppeteerService {
       const input = (await page.waitForSelector(
         '.FilePicker-callToActionFileInput',
         { timeout: 20000 }, // Увеличили таймаут
-      )) as puppeteer.ElementHandle<HTMLInputElement>;
+      )) as ElementHandle<HTMLInputElement>;
 
       if (!input) {
         console.error('[handleMediaUpload] Image input not found');
@@ -766,7 +788,7 @@ export class PuppeteerService {
     }
   }
 
-  private async publishPost(page: puppeteer.Page): Promise<string> {
+  private async publishPost(page: Page): Promise<string> {
     await page.waitForSelector('button[data-test-id="tweetSaveButton"]', {
       timeout: 10000,
     });

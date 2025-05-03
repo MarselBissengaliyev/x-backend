@@ -24,7 +24,7 @@ export class AccountsService {
         password: data.password,
         proxy: data.proxy,
         userAgent,
-      });
+      }); 
 
       // Проверяем, был ли логин успешным
       if (result.success === false || !page) {
@@ -61,7 +61,7 @@ export class AccountsService {
       return { success: true, id: account.id };
     } catch (err) {
       this.logger.error(`Login failed for login: ${data.login}`, err.stack);
-      throw new Error('Логин не удался');
+      return { success: false, error: err.message || 'Unexpected error occurred during login' };
     }
   }
 
