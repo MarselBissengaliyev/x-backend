@@ -76,65 +76,10 @@ export class ScheduleService {
         ];
 
         // 📌 Атомарный выбор и пометка isUsed
-        let image = await this.prisma.$transaction(async (tx) => {
-          const candidate = await tx.image.findFirst({
-            where: { isUsed: false },
-            orderBy: { id: 'asc' },
-          });
-          if (!candidate) return null;
-          const updated = await tx.image.update({
-            where: { id: candidate.id },
-            data: { isUsed: true },
-          });
-          return updated;
-        });
-
-        if (!image && dto.imagesSource) {
-          const folderId = extractFolderId(dto.imagesSource);
-
-          if (!folderId) {
-            this.logger.warn('Invalid Google Drive folder link');
-            await this.prisma.scheduledPost.update({
-              where: { id: scheduledPost.id },
-              data: { status: 'no_images' },
-            });
-            return;
-          }
-
-          const googleImageIds =
-            await this.googleDriveService.getImagesFromFolder(folderId);
-
-          if (!googleImageIds.length) {
-            this.logger.warn('No images found in the folder');
-            await this.prisma.scheduledPost.update({
-              where: { id: scheduledPost.id },
-              data: { status: 'no_images' },
-            });
-            return;
-          }
-
-
-          await Promise.all(
-            googleImageIds.map((id) => {
-              return this.prisma.image.create({
-                data: {
-                  url: `https://drive.google.com/uc?id=${id}`,
-                  scheduledPostId: scheduledPost.id
-                }
-              });
-            })
-          );
-          
-
-          // Повторная попытка: атомарно
-          image = await this.prisma.$transaction(async (tx) => {
+        if (dto.imagesSource) {
+          let image = await this.prisma.$transaction(async (tx) => {
             const candidate = await tx.image.findFirst({
-              where: {
-                isUsed: false,
-                scheduledPost: {
-                  id: scheduledPost.id,
-                },
-              },
+              where: { isUsed: false },
               orderBy: { id: 'asc' },
             });
             if (!candidate) return null;
@@ -144,22 +89,75 @@ export class ScheduleService {
             });
             return updated;
           });
+
+          if (!image && dto.imagesSource) {
+            const folderId = extractFolderId(dto.imagesSource);
+
+            if (!folderId) {
+              this.logger.warn('Invalid Google Drive folder link');
+              await this.prisma.scheduledPost.update({
+                where: { id: scheduledPost.id },
+                data: { status: 'no_images' },
+              });
+              return;
+            }
+
+            const googleImageIds =
+              await this.googleDriveService.getImagesFromFolder(folderId);
+
+            if (!googleImageIds.length) {
+              this.logger.warn('No images found in the folder');
+              await this.prisma.scheduledPost.update({
+                where: { id: scheduledPost.id },
+                data: { status: 'no_images' },
+              });
+              return;
+            }
+
+            await Promise.all(
+              googleImageIds.map((id) => {
+                return this.prisma.image.create({
+                  data: {
+                    url: `https://drive.google.com/uc?id=${id}`,
+                    scheduledPostId: scheduledPost.id,
+                  },
+                });
+              }),
+            );
+
+            // Повторная попытка: атомарно
+            image = await this.prisma.$transaction(async (tx) => {
+              const candidate = await tx.image.findFirst({
+                where: {
+                  isUsed: false,
+                  scheduledPost: {
+                    id: scheduledPost.id,
+                  },
+                },
+                orderBy: { id: 'asc' },
+              });
+              if (!candidate) return null;
+              const updated = await tx.image.update({
+                where: { id: candidate.id },
+                data: { isUsed: true },
+              });
+              return updated;
+            });
+          }
+
+          if (!image) {
+            this.logger.warn('Still no unused images after inserting');
+            await this.prisma.scheduledPost.update({
+              where: { id: scheduledPost.id },
+              data: { status: 'no_images' },
+            });
+            return;
+          }
+          const fileId = new URL(image.url).searchParams.get('id');
+          if (!fileId) throw new Error('Invalid image URL: missing file ID');
+          downloadedImagePath =
+            await this.googleDriveService.downloadFile(fileId);
         }
-
-        if (!image) {
-          this.logger.warn('Still no unused images after inserting');
-          await this.prisma.scheduledPost.update({
-            where: { id: scheduledPost.id },
-            data: { status: 'no_images' },
-          });
-          return;
-        }
-
-        const fileId = new URL(image.url).searchParams.get('id');
-        if (!fileId) throw new Error('Invalid image URL: missing file ID');
-
-        downloadedImagePath =
-          await this.googleDriveService.downloadFile(fileId);
 
         if (promptImage) {
           generateContentTasks.push(
@@ -220,39 +218,38 @@ export class ScheduleService {
             if (err) this.logger.warn(`File cleanup failed: ${err.message}`);
             else this.logger.log(`Deleted temp file: ${downloadedImagePath}`);
           });
-        }
-
-        const allUsed = await this.prisma.image.count({
-          where: {
-            scheduledPost: {
-              id: scheduledPost.id
+          const allUsed = await this.prisma.image.count({
+            where: {
+              scheduledPost: {
+                id: scheduledPost.id,
+              },
+              isUsed: false,
             },
-            isUsed: false,
-          },
-        });
-
-        if (allUsed === 0) {
-          this.logger.warn(
-            `No more images for post ${scheduledPost.id}. Waiting for new ones.`,
-          );
-
-          const cronJob = this.cronJobs.get(scheduledPost.id);
-          if (cronJob) {
-            cronJob.stop();
-            this.cronJobs.delete(scheduledPost.id);
-            this.logger.log(
-              `All images used. Stopped cron job for post ${scheduledPost.id}`,
-            );
-          }
-
-          // Обновляем статус, чтобы видно было, что задача "ждёт"
-          await this.prisma.scheduledPost.update({
-            where: { id: scheduledPost.id },
-            data: { status: 'google_drive_done' },
           });
 
-          // ❗ Не останавливаем cron — он будет снова пытаться на следующей итерации
-          return;
+          if (allUsed === 0) {
+            this.logger.warn(
+              `No more images for post ${scheduledPost.id}. Waiting for new ones.`,
+            );
+
+            const cronJob = this.cronJobs.get(scheduledPost.id);
+            if (cronJob) {
+              cronJob.stop();
+              this.cronJobs.delete(scheduledPost.id);
+              this.logger.log(
+                `All images used. Stopped cron job for post ${scheduledPost.id}`,
+              );
+            }
+
+            // Обновляем статус, чтобы видно было, что задача "ждёт"
+            await this.prisma.scheduledPost.update({
+              where: { id: scheduledPost.id },
+              data: { status: 'google_drive_done' },
+            });
+
+            // ❗ Не останавливаем cron — он будет снова пытаться на следующей итерации
+            return;
+          }
         }
       }
     });
