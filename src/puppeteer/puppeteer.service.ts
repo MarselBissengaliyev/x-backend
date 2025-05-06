@@ -571,7 +571,10 @@ export class PuppeteerService {
       };
     }
 
-    const match = page.url().match(/analytics\/([^/]+)\/campaigns/);
+    const match =
+    page.url().match(/analytics\/([^/]+)\/campaigns/) ||
+    page.url().match(/composer\/([^/]+)\/carousel/) ||
+    page.url().match(/campaign_form\/([^/]+)\/campaign\/new/);
     if (!match) throw new Error('Ads Account ID не найден');
     const adsAccountId = match[1];
 
