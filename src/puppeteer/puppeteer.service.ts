@@ -494,7 +494,7 @@ export class PuppeteerService {
 
       await page.waitForSelector(dropdownButtonSelector, {
         visible: true,
-        timeout: 10000,
+        timeout: 20000,
       });
 
       // Используем boundingBox и click через evaluate, чтобы избежать overlay ошибок
@@ -510,6 +510,7 @@ export class PuppeteerService {
       }, dropdownButtonSelector);
 
       await dropdownButton.click();
+      await delay(500); // 👈 0.5 секунды паузы
       this.logger.log('Dropdown opened');
 
       const optionSelector = 'li[data-testid="card-type-dropdown-WEBSITE"]';
