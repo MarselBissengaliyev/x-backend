@@ -116,7 +116,9 @@ export class ScheduleService {
           await this.prisma.image.createMany({
             data: googleImageIds.map((id) => ({
               url: `https://drive.google.com/uc?id=${id}`,
-              scheduledPostId: scheduledPost.id,
+              scheduledPost: {
+                id: scheduledPost.id,
+              },  
             })),
           });
 
