@@ -125,7 +125,9 @@ export class ScheduleService {
             const candidate = await tx.image.findFirst({
               where: {
                 isUsed: false,
-                scheduledPostId: scheduledPost.id,
+                scheduledPost: {
+                  id: scheduledPost.id,
+                },
               },
               orderBy: { id: 'asc' },
             });
@@ -222,11 +224,13 @@ export class ScheduleService {
 
         const allUsed = await this.prisma.image.count({
           where: {
-            scheduledPostId: scheduledPost.id,
+            scheduledPost: {
+              id: scheduledPost.id
+            },
             isUsed: false,
           },
         });
-        
+
         if (allUsed === 0) {
           this.logger.warn(
             `No more images for post ${scheduledPost.id}. Waiting for new ones.`,
@@ -240,18 +244,16 @@ export class ScheduleService {
               `All images used. Stopped cron job for post ${scheduledPost.id}`,
             );
           }
-        
+
           // Обновляем статус, чтобы видно было, что задача "ждёт"
           await this.prisma.scheduledPost.update({
             where: { id: scheduledPost.id },
             data: { status: 'google_drive_done' },
           });
-        
+
           // ❗ Не останавливаем cron — он будет снова пытаться на следующей итерации
           return;
         }
-        
-        
       }
     });
 

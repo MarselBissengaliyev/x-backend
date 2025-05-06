@@ -44,7 +44,7 @@ model ScheduledPost {
   id          String   @id @default(uuid())
   accountId   String
   imageId     String?  @unique
-  image       Image?   @relation(fields: [imageId], references: [id])
+  image       Image?   @relation("ImageToScheduledPost", fields: [imageId], references: [id])
   scheduledAt DateTime
   status      String // pending, done, failed, no_images, captcha_required
   createdAt   DateTime @default(now())
@@ -62,9 +62,8 @@ model ScheduledPost {
 }
 
 model Image {
-  id              String         @id @default(cuid())
-  url             String
-  isUsed          Boolean        @default(false)
-  scheduledPost   ScheduledPost?
-  scheduledPostId String?
+  id            String         @id @default(cuid())
+  url           String
+  isUsed        Boolean        @default(false)
+  scheduledPost ScheduledPost? @relation("ImageToScheduledPost")
 }
