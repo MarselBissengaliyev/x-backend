@@ -262,9 +262,14 @@ export class ScheduleService {
   async removeScheduledPostJob(scheduledPostId: string) {
     // Если хочешь удалять и запись из базы:
     try {
+      await this.prisma.image.deleteMany({
+        where: { scheduledPostId },
+      });
+      
       await this.prisma.scheduledPost.delete({
         where: { id: scheduledPostId },
       });
+      
       const task = this.cronJobs.get(scheduledPostId);
 
       if (task) {
