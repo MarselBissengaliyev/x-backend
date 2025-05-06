@@ -43,10 +43,10 @@ model Post {
 model ScheduledPost {
   id          String   @id @default(uuid())
   accountId   String
-  imageId     String?  @unique
-  image       Image?   @relation("ImageToScheduledPost", fields: [imageId], references: [id])
+  images      Image[]  // <- изменено: теперь массив изображений
   scheduledAt DateTime
-  status      String // pending, done, failed, no_images, captcha_required
+  status      String
+
   createdAt   DateTime @default(now())
 
   promptText     String?
@@ -56,14 +56,15 @@ model ScheduledPost {
   autoPost       Boolean? @default(false)
   cronExpression String?
   promotedOnly   Boolean? @default(false)
-  useAiOnImage   Boolean? // Только для метода 2
+  useAiOnImage   Boolean?
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
 
 model Image {
-  id            String         @id @default(cuid())
-  url           String
-  isUsed        Boolean        @default(false)
-  scheduledPost ScheduledPost? @relation("ImageToScheduledPost")
+  id              String         @id @default(cuid())
+  url             String
+  isUsed          Boolean        @default(false)
+  scheduledPostId String         // <- внеш. ключ
+  scheduledPost   ScheduledPost @relation(fields: [scheduledPostId], references: [id])
 }

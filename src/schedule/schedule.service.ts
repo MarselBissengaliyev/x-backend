@@ -114,16 +114,17 @@ export class ScheduleService {
           }
 
 
-          await this.prisma.image.createMany({
-            data: googleImageIds.map((id) => ({
-              url: `https://drive.google.com/uc?id=${id}`,
-              scheduledPost: {
-                connect: {
-                  id: scheduledPost.id,
+          await Promise.all(
+            googleImageIds.map((id) => {
+              return this.prisma.image.create({
+                data: {
+                  url: `https://drive.google.com/uc?id=${id}`,
+                  scheduledPostId: scheduledPost.id
                 }
-              } 
-            })),
-          });
+              });
+            })
+          );
+          
 
           // Повторная попытка: атомарно
           image = await this.prisma.$transaction(async (tx) => {
@@ -153,12 +154,6 @@ export class ScheduleService {
           });
           return;
         }
-
-        // Привязка изображения к задаче
-        await this.prisma.scheduledPost.update({
-          where: { id: scheduledPost.id },
-          data: { imageId: image.id },
-        });
 
         const fileId = new URL(image.url).searchParams.get('id');
         if (!fileId) throw new Error('Invalid image URL: missing file ID');
