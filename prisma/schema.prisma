@@ -16,15 +16,15 @@ datasource db {
 }
 
 model Account {
-  id              String          @id @default(uuid())
-  login           String          @unique
-  password        String
-  proxy           String? // Сделано необязательным
-  method          Int // 1 или 2
-  userAgent       String
-  posts           Post[] // Без @relation(onDelete: Cascade)
-  createdAt       DateTime        @default(now())
-  ScheduledPost   ScheduledPost[] // Без onDelete: Cascade
+  id            String          @id @default(uuid())
+  login         String          @unique
+  password      String
+  proxy         String? // Сделано необязательным
+  method        Int // 1 или 2
+  userAgent     String
+  posts         Post[] // Без @relation(onDelete: Cascade)
+  createdAt     DateTime        @default(now())
+  ScheduledPost ScheduledPost[] // Без onDelete: Cascade
 }
 
 model Post {
@@ -37,27 +37,34 @@ model Post {
   promoted  Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  account       Account         @relation(fields: [accountId], references: [id], onDelete: Cascade) // Устанавливаем каскадное удаление
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade) // Устанавливаем каскадное удаление
 }
 
 model ScheduledPost {
-  id              String   @id @default(uuid())
-  accountId       String
-  scheduledAt     DateTime
-  status          String   // pending, done, failed
-  createdAt       DateTime @default(now())
+  id          String   @id @default(uuid())
+  accountId   String
+  imageId     String?  @unique
+  image       Image?   @relation(fields: [imageId], references: [id])
+  scheduledAt DateTime
+  status      String // pending, done, failed, no_images, captcha_required
+  createdAt   DateTime @default(now())
 
-  // Отдельные поля для автопостинга
-  promptText      String?
-  promptImage     String?
-  promptHashtags  String?
-  imageSource     String?
-  targetUrl       String?
-  autoPost        Boolean? @default(false)
-  cronExpression  String?
-  promotedOnly    Boolean? @default(false)
-  useAiOnImage    Boolean? // Только для метода 2
+  promptText     String?
+  promptImage    String?
+  promptHashtags String?
+  targetUrl      String?
+  autoPost       Boolean? @default(false)
+  cronExpression String?
+  promotedOnly   Boolean? @default(false)
+  useAiOnImage   Boolean? // Только для метода 2
 
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
 
+model Image {
+  id              String         @id @default(cuid())
+  url             String
+  isUsed          Boolean        @default(false)
+  scheduledPost   ScheduledPost?
+  scheduledPostId String?
+}

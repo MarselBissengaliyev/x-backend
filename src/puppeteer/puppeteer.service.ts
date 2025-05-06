@@ -87,24 +87,33 @@ export class PuppeteerService {
             waitUntil: 'networkidle2',
             timeout: 15000,
           });
-        
+
           const status = response?.status();
           if (!status || status >= 400) {
-            throw new Error(`Failed to load page via proxy. Status code: ${status}`);
+            throw new Error(
+              `Failed to load page via proxy. Status code: ${status}`,
+            );
           }
-        
+
           // Дополнительная проверка на заглушку прокси (часто page.content содержит "ERR_" или "proxy")
           const content = await page.content();
-          if (content.includes('ERR_') || content.toLowerCase().includes('proxy')) {
-            throw new Error('Failed to load page due to proxy connection error.');
+          if (
+            content.includes('ERR_') ||
+            content.toLowerCase().includes('proxy')
+          ) {
+            throw new Error(
+              'Failed to load page due to proxy connection error.',
+            );
           }
         } catch (err) {
-          this.logger.error('Proxy authorization failed or page unreachable:', err);
+          this.logger.error(
+            'Proxy authorization failed or page unreachable:',
+            err,
+          );
           throw new BadRequestException(
             'Не удалось подключиться через указанный прокси. Проверьте IP, порт и учетные данные.',
           );
         }
-        
 
         this.logger.log('Typing login...');
         await page.waitForSelector('input[name="text"]', { timeout: 10000 });
@@ -329,13 +338,16 @@ export class PuppeteerService {
     try {
       const account = await this.getAccountOrThrow(post.accountId);
 
-      browser = await this.launchBrowser(account.proxy);
-      let page: Page;
-      if (browser instanceof Browser) {
-        page = await browser.newPage();
-      } else {
-        page = browser;
+      const launchResult = await this.launchBrowser(account.proxy);
+      browser = launchResult.browser;
+      const auth = launchResult.auth;
+  
+      const page = await browser.newPage();
+  
+      if (auth) {
+        await page.authenticate(auth);
       }
+  
 
       await page.setUserAgent(userAgent);
       await this.loadCookies(page, account.login);
@@ -377,9 +389,11 @@ export class PuppeteerService {
       console.error('Error submitting post:', error); // Для логирования ошибок
       return { success: false, message: error.message || 'Unknown error' };
     } finally {
-      if (browser && 'close' in browser) {
+      if (browser) {
+        const pages = await browser.pages();
+        await Promise.all(pages.map(p => p.close()));
         await browser.close();
-      }
+      }      
     }
   }
 
@@ -430,7 +444,10 @@ export class PuppeteerService {
     return account;
   }
 
-  private async launchBrowser(proxy: string | null): Promise<Browser | Page> {
+  private async launchBrowser(proxy: string | null): Promise<{
+    browser: Browser;
+    auth?: { username: string; password: string };
+  }> {
     const args = [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -439,28 +456,16 @@ export class PuppeteerService {
       '--no-zygote',
       '--incognito',
     ];
-    let proxyAuth: { username: string; password: string } | null = null;
+    let proxyAuth: { username: string; password: string } | undefined =
+      undefined;
 
     if (proxy) {
-      const proxyParts = proxy.split(':');
+      const [ip, port, username, pwd] = proxy.split(':');
+      if (!ip || !port) throw new BadRequestException('Invalid proxy format');
 
-      if (proxyParts.length < 2) {
-        throw new BadRequestException(
-          'Невалидный формат прокси. Ожидается IP:PORT или IP:PORT:LOGIN:PASSWORD',
-        );
-      }
-
-      const [ip, port, username, pwd] = proxyParts;
-      const proxyUrl = `http://${ip}:${port}`;
-      args.unshift(`--proxy-server=${proxyUrl}`);
-      this.logger.log(`Using proxy: ${proxyUrl}`);
-
+      args.unshift(`--proxy-server=http://${ip}:${port}`);
       if (username && pwd) {
-        proxyAuth = {
-          username,
-          password: pwd,
-        };
-        this.logger.log('Proxy authentication credentials set');
+        proxyAuth = { username, password: pwd };
       }
     }
 
@@ -471,14 +476,7 @@ export class PuppeteerService {
       args,
     });
 
-    if (proxyAuth) {
-      const page = await browser.newPage();
-      await page.authenticate(proxyAuth);
-      this.logger.log('Proxy authentication applied');
-      return page;
-    }
-
-    return browser;
+    return { browser, auth: proxyAuth };
   }
 
   private async setTargetUrlCard(page: Page, url: string) {

@@ -24,15 +24,15 @@ export class GoogleDriveService {
 
   async downloadFile(fileId: string): Promise<string> {
     const downloadsDir = path.resolve('./downloads');
-  
+
     // ✅ Проверка и создание папки, если её нет
     if (!fs.existsSync(downloadsDir)) {
       fs.mkdirSync(downloadsDir, { recursive: true });
     }
-  
-    const filePath = path.join(downloadsDir, `${fileId}.jpg`);
+
+    const filePath = path.join(downloadsDir, `${fileId}-${Date.now()}.jpg`);
     const dest = fs.createWriteStream(filePath);
-  
+
     const res = await this.drive.files.get(
       {
         fileId,
@@ -41,7 +41,7 @@ export class GoogleDriveService {
       },
       { responseType: 'stream' },
     );
-  
+
     return new Promise((resolve, reject) => {
       res.data
         .on('end', () => {
@@ -55,5 +55,4 @@ export class GoogleDriveService {
         .pipe(dest);
     });
   }
-  
 }

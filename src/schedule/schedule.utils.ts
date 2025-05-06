@@ -13,3 +13,4 @@ export function extractFolderId(link: string): string | null {
   const match = link.match(/\/folders\/([a-zA-Z0-9_-]+)/);
   return match ? match[1] : null;
 }
+
