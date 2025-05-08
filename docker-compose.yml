@@ -2,31 +2,24 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:15-alpine  # Используем минимизированный образ
+    image: postgres:15-alpine
     container_name: x_postgres
     restart: always
     environment:
       POSTGRES_DB: mydatabase
       POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # Используем переменные окружения для пароля
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "127.0.0.1:5432:5432"  # Ограничение доступа только локально
+      - "5432:5432"  # Убираем ограничение на локальный хост
     volumes:
       - pgdata:/var/lib/postgresql/data
-
     networks:
       - db_network
-    security_opt:
-      - seccomp:unconfined  # Более безопасная политика seccomp
-    cap_drop:
-      - ALL  # Убираем все дополнительные возможности
-    cap_add:
-      - NET_BIND_SERVICE  # Разрешаем доступ к портам <1024
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
-        max-file: "3"  # Лимитируем размер логов и количество файлов
+        max-file: "3"
 
 volumes:
   pgdata:
