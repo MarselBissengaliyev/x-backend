@@ -17,7 +17,6 @@ services:
       - db_network
     security_opt:
       - seccomp:unconfined  # Более безопасная политика seccomp
-      - apparmor:docker  # Дополнительная безопасность через AppArmor
     cap_drop:
       - ALL  # Убираем все дополнительные возможности
     cap_add:
