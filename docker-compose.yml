@@ -4,22 +4,29 @@ services:
   postgres:
     image: postgres:15
     container_name: x_postgres
-    restart: always  # Контейнер будет перезапускаться всегда
+    restart: always
     environment:
       POSTGRES_DB: mydatabase
-      POSTGRES_USER: ${POSTGRES_USER}  # Используйте переменные из .env файла
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # Используйте переменные из .env файла
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"  # Ограничение доступа только локально
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
-      - db_network  # Создаем отдельную сеть для безопасности
+      - db_network
+    security_opt:
+      - seccomp:unconfined  # Установка политики безопасности
+    secrets:
+      - postgres_password  # Использование Docker Secrets для хранения пароля
 
 volumes:
   pgdata:
-  
+
 networks:
   db_network:
-    driver: bridge  # Изолирует вашу базу данных от внешнего мира
+    driver: bridge
 
+secrets:
+  postgres_password:
+    external: true  # Используем внешний секрет
