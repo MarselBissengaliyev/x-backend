@@ -16,7 +16,8 @@ services:
     networks:
       - db_network
     security_opt:
-      - seccomp:unconfined  # Установка политики безопасности
+      - seccomp:default  # Более безопасная политика seccomp
+    user: postgres_user  # Указываем непривилегированного пользователя
     secrets:
       - postgres_password  # Использование Docker Secrets для хранения пароля
 
