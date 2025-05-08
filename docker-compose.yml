@@ -4,15 +4,22 @@ services:
   postgres:
     image: postgres:15
     container_name: x_postgres
-    restart: unless-stopped
+    restart: always  # Контейнер будет перезапускаться всегда
     environment:
       POSTGRES_DB: mydatabase
-      POSTGRES_USER: postgres  # Изменили на 'postgres'
-      POSTGRES_PASSWORD: mypassword  # Установите нужный пароль для 'postgres'
+      POSTGRES_USER: ${POSTGRES_USER}  # Используйте переменные из .env файла
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # Используйте переменные из .env файла
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - db_network  # Создаем отдельную сеть для безопасности
 
 volumes:
   pgdata:
+  
+networks:
+  db_network:
+    driver: bridge  # Изолирует вашу базу данных от внешнего мира
+
