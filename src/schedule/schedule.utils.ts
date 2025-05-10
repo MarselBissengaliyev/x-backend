@@ -10,7 +10,21 @@ export function getNextDateFromCron(cronExpression: string): Date {
 }
 
 export function extractFolderId(link: string): string | null {
-  const match = link.match(/\/folders\/([a-zA-Z0-9_-]+)/);
-  return match ? match[1] : null;
+  // Если это просто ID (без ссылки)
+  if (/^[\w-]{10,}$/.test(link)) return link;
+
+  // Попробуем найти ID в разных форматах ссылок
+  const patterns = [
+    /\/folders\/([\w-]+)/,
+    /[?&]id=([\w-]+)/,
+    /\/d\/([\w-]+)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = link.match(pattern);
+    if (match) return match[1];
+  }
+
+  return null;
 }
 
