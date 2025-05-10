@@ -68,12 +68,44 @@ export class ScheduleService {
       try {
         this.logger.log(`Executing scheduled post for account: ${accountId}`);
 
-        const generateContentTasks = [
-          this.contentSettingsService.generate({
-            prompt: promptText,
-            type: ContentType.TEXT,
-          }),
-        ];
+        // Чётко именуем каждую задачу
+        const textGen = this.contentSettingsService.generate({
+          prompt: promptText,
+          type: ContentType.TEXT,
+        });
+
+        const imageGen = promptImage
+          ? this.contentSettingsService.generate({
+              prompt: promptImage,
+              type: ContentType.IMAGE,
+            })
+          : null;
+
+        const hashtagsGen = promptHashtags
+          ? this.contentSettingsService.generate({
+              prompt: promptHashtags,
+              type: ContentType.HASHTAGS,
+            })
+          : null;
+
+        // Ждём только существующие промисы
+        const [newText, newImage, newHashtags] = await Promise.all([
+          textGen,
+          imageGen,
+          hashtagsGen,
+        ]);
+
+        const result = await this.puppeteerService.submitPost(
+          {
+            accountId,
+            content: newText.result,
+            hashtags: newHashtags?.result ?? null,
+            imageUrl: downloadedImagePath || newImage?.result || null,
+            promoted: promotedOnly || false,
+            targetUrl: targetUrl ?? null,
+          },
+          userAgent,
+        );
 
         // 📌 Атомарный выбор и пометка isUsed
         if (dto.imagesSource) {
@@ -159,38 +191,6 @@ export class ScheduleService {
             await this.googleDriveService.downloadFile(fileId);
         }
 
-        if (promptImage) {
-          generateContentTasks.push(
-            this.contentSettingsService.generate({
-              prompt: promptImage,
-              type: ContentType.IMAGE,
-            }),
-          );
-        }
-
-        if (promptHashtags) {
-          generateContentTasks.push(
-            this.contentSettingsService.generate({
-              prompt: promptHashtags,
-              type: ContentType.HASHTAGS,
-            }),
-          );
-        }
-
-        const [newText, newImage, newHashtags] =
-          await Promise.all(generateContentTasks);
-
-        const result = await this.puppeteerService.submitPost(
-          {
-            accountId,
-            content: newText.result,
-            hashtags: newHashtags?.result ?? null,
-            imageUrl: downloadedImagePath || newImage?.result || null,
-            promoted: promotedOnly || false,
-            targetUrl: targetUrl ?? null,
-          },
-          userAgent,
-        );
 
         if (result.captchaDetected) {
           await this.prisma.scheduledPost.update({
@@ -265,11 +265,11 @@ export class ScheduleService {
       await this.prisma.image.deleteMany({
         where: { scheduledPostId },
       });
-      
+
       await this.prisma.scheduledPost.delete({
         where: { id: scheduledPostId },
       });
-      
+
       const task = this.cronJobs.get(scheduledPostId);
 
       if (task) {
