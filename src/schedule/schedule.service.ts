@@ -95,18 +95,6 @@ export class ScheduleService {
           hashtagsGen,
         ]);
 
-        const result = await this.puppeteerService.submitPost(
-          {
-            accountId,
-            content: newText.result,
-            hashtags: newHashtags?.result ?? null,
-            imageUrl: downloadedImagePath || newImage?.result || null,
-            promoted: promotedOnly || false,
-            targetUrl: targetUrl ?? null,
-          },
-          userAgent,
-        );
-
         // 📌 Атомарный выбор и пометка isUsed
         if (dto.imagesSource) {
           let image = await this.prisma.$transaction(async (tx) => {
@@ -191,6 +179,17 @@ export class ScheduleService {
             await this.googleDriveService.downloadFile(fileId);
         }
 
+        const result = await this.puppeteerService.submitPost(
+          {
+            accountId,
+            content: newText.result,
+            hashtags: newHashtags?.result ?? null,
+            imageUrl: downloadedImagePath || newImage?.result || null,
+            promoted: promotedOnly || false,
+            targetUrl: targetUrl ?? null,
+          },
+          userAgent,
+        );
 
         if (result.captchaDetected) {
           await this.prisma.scheduledPost.update({
